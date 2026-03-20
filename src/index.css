@@ -1,0 +1,219 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Academic paper-like background */
+    --background: 40 33% 98%;
+    --foreground: 220 25% 15%;
+
+    /* Cards with subtle warmth */
+    --card: 40 20% 99%;
+    --card-foreground: 220 25% 15%;
+
+    --popover: 40 20% 99%;
+    --popover-foreground: 220 25% 15%;
+
+    /* Deep navy primary */
+    --primary: 220 60% 25%;
+    --primary-foreground: 40 33% 98%;
+
+    /* Soft gray secondary */
+    --secondary: 220 15% 92%;
+    --secondary-foreground: 220 25% 25%;
+
+    /* Muted tones */
+    --muted: 220 15% 94%;
+    --muted-foreground: 220 15% 45%;
+
+    /* Teal accent */
+    --accent: 175 60% 40%;
+    --accent-foreground: 40 33% 98%;
+
+    /* Error states */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 40 33% 98%;
+
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 220 60% 25%;
+
+    --radius: 0.625rem;
+
+    /* Logic group colors for K-map visualization */
+    --group-1: 175 70% 45%;
+    --group-2: 35 90% 55%;
+    --group-3: 340 70% 55%;
+    --group-4: 270 60% 55%;
+    --group-5: 140 60% 45%;
+    --group-6: 200 80% 50%;
+
+    /* Step indicator colors */
+    --step-active: 175 60% 40%;
+    --step-complete: 140 60% 45%;
+    --step-pending: 220 15% 75%;
+
+    /* Expression highlights */
+    --highlight-minterm: 175 60% 90%;
+    --highlight-maxterm: 35 80% 90%;
+    --highlight-dontcare: 220 15% 85%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 220 25% 10%;
+    --foreground: 40 20% 95%;
+
+    --card: 220 25% 12%;
+    --card-foreground: 40 20% 95%;
+
+    --popover: 220 25% 12%;
+    --popover-foreground: 40 20% 95%;
+
+    --primary: 175 60% 50%;
+    --primary-foreground: 220 25% 10%;
+
+    --secondary: 220 20% 20%;
+    --secondary-foreground: 40 20% 90%;
+
+    --muted: 220 20% 18%;
+    --muted-foreground: 220 15% 60%;
+
+    --accent: 175 60% 45%;
+    --accent-foreground: 220 25% 10%;
+
+    --destructive: 0 62.8% 45%;
+    --destructive-foreground: 40 20% 95%;
+
+    --border: 220 20% 22%;
+    --input: 220 20% 22%;
+    --ring: 175 60% 50%;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  code, .mono {
+    @apply font-mono;
+  }
+}
+
+@layer components {
+  .kmap-cell {
+    @apply w-12 h-12 border border-border flex items-center justify-center font-mono text-lg cursor-pointer transition-all duration-200;
+  }
+
+  .kmap-cell:hover {
+    @apply bg-accent/10;
+  }
+
+  .kmap-cell.value-0 {
+    @apply bg-muted/50 text-muted-foreground;
+  }
+
+  .kmap-cell.value-1 {
+    @apply bg-primary/10 text-primary font-semibold;
+  }
+
+  .kmap-cell.value-x {
+    @apply bg-highlight-dontcare text-muted-foreground italic;
+  }
+
+  .truth-table {
+    @apply w-full border-collapse font-mono text-sm;
+  }
+
+  .truth-table th {
+    @apply bg-primary text-primary-foreground px-4 py-2 text-center font-semibold;
+  }
+
+  .truth-table td {
+    @apply border border-border px-4 py-2 text-center;
+  }
+
+  .truth-table tr:nth-child(even) td {
+    @apply bg-muted/30;
+  }
+
+  .step-indicator {
+    @apply flex items-center gap-2;
+  }
+
+  .step-dot {
+    @apply w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300;
+  }
+
+  .step-dot.active {
+    @apply bg-accent text-accent-foreground scale-110;
+  }
+
+  .step-dot.complete {
+    @apply bg-step-complete text-primary-foreground;
+  }
+
+  .step-dot.pending {
+    @apply bg-step-pending text-muted-foreground;
+  }
+
+  .expression-display {
+    @apply font-mono text-lg bg-card border border-border rounded-lg px-4 py-3;
+  }
+
+  .group-overlay {
+    @apply absolute inset-0 rounded-lg border-2 pointer-events-none;
+  }
+}
+
+@layer utilities {
+  .bg-group-1 { background-color: hsl(var(--group-1) / 0.25); border-color: hsl(var(--group-1)); }
+  .bg-group-2 { background-color: hsl(var(--group-2) / 0.25); border-color: hsl(var(--group-2)); }
+  .bg-group-3 { background-color: hsl(var(--group-3) / 0.25); border-color: hsl(var(--group-3)); }
+  .bg-group-4 { background-color: hsl(var(--group-4) / 0.25); border-color: hsl(var(--group-4)); }
+  .bg-group-5 { background-color: hsl(var(--group-5) / 0.25); border-color: hsl(var(--group-5)); }
+  .bg-group-6 { background-color: hsl(var(--group-6) / 0.25); border-color: hsl(var(--group-6)); }
+
+  .text-group-1 { color: hsl(var(--group-1)); }
+  .text-group-2 { color: hsl(var(--group-2)); }
+  .text-group-3 { color: hsl(var(--group-3)); }
+  .text-group-4 { color: hsl(var(--group-4)); }
+  .text-group-5 { color: hsl(var(--group-5)); }
+  .text-group-6 { color: hsl(var(--group-6)); }
+
+  .border-group-1 { border-color: hsl(var(--group-1)); }
+  .border-group-2 { border-color: hsl(var(--group-2)); }
+  .border-group-3 { border-color: hsl(var(--group-3)); }
+  .border-group-4 { border-color: hsl(var(--group-4)); }
+  .border-group-5 { border-color: hsl(var(--group-5)); }
+  .border-group-6 { border-color: hsl(var(--group-6)); }
+}
