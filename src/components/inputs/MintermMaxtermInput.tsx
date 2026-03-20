@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/store/appStore';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,69 +6,71 @@ import { Badge } from '@/components/ui/badge';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { normalizeFromMaxterms, normalizeFromMinterms } from '@/logic/normalize/inputNormalizer';
 
+type ValidationResult = {
+  parsed: number[];
+  error: string | null;
+};
+
+function parseTermList(value: string, maxValue: number): ValidationResult {
+  if (!value.trim()) {
+    return { parsed: [], error: null };
+  }
+
+  const terms = value.split(',').map((s) => s.trim()).filter(Boolean);
+  const parsed: number[] = [];
+
+  for (const term of terms) {
+    if (!/^\d+$/.test(term)) {
+      return { parsed: [], error: `Invalid value: "${term}"` };
+    }
+
+    const num = Number(term);
+    if (!Number.isInteger(num) || num < 0 || num > maxValue) {
+      return { parsed: [], error: `Value ${num} out of range (0-${maxValue})` };
+    }
+
+    parsed.push(num);
+  }
+
+  const unique = new Set(parsed);
+  if (unique.size !== parsed.length) {
+    return { parsed: [], error: 'Duplicate values detected' };
+  }
+
+  return { parsed: [...unique], error: null };
+}
+
 export function MintermInput() {
   const { variableConfig, setCanonicalForm } = useAppStore();
   const { count, labels } = variableConfig;
   
   const [minterms, setMinterms] = useState('');
   const [dontCares, setDontCares] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   const maxValue = Math.pow(2, count) - 1;
 
-  const validateInput = (value: string, type: 'minterms' | 'dontcares'): number[] | null => {
-    if (!value.trim()) return [];
-    
-    const terms = value.split(',').map(s => s.trim()).filter(Boolean);
-    const parsed: number[] = [];
-    
-    for (const term of terms) {
-      const num = parseInt(term);
-      if (isNaN(num)) {
-        setError(`Invalid value: "${term}"`);
-        return null;
-      }
-      if (num < 0 || num > maxValue) {
-        setError(`Value ${num} out of range (0-${maxValue})`);
-        return null;
-      }
-      parsed.push(num);
-    }
-    
-    // Check for duplicates
-    const unique = new Set(parsed);
-    if (unique.size !== parsed.length) {
-      setError('Duplicate values detected');
-      return null;
-    }
-    
-    setError(null);
-    return [...unique];
-  };
+  const mintermResult = useMemo(() => parseTermList(minterms, maxValue), [minterms, maxValue]);
+  const dontCareResult = useMemo(() => parseTermList(dontCares, maxValue), [dontCares, maxValue]);
 
-  const handleMintermsChange = (value: string) => {
-    setMinterms(value);
-    validateInput(value, 'minterms');
-  };
+  const overlap = useMemo(() => {
+    const mintermSet = new Set(mintermResult.parsed);
+    return dontCareResult.parsed.find((term) => mintermSet.has(term));
+  }, [mintermResult.parsed, dontCareResult.parsed]);
 
-  const handleDontCaresChange = (value: string) => {
-    setDontCares(value);
-    validateInput(value, 'dontcares');
-  };
-
-  const parsedMinterms = validateInput(minterms, 'minterms');
-  const parsedDontCares = validateInput(dontCares, 'dontcares');
+  const error = mintermResult.error
+    ?? dontCareResult.error
+    ?? (overlap !== undefined ? `Value ${overlap} cannot be both minterm and don't care` : null);
 
   useEffect(() => {
-    if (error || parsedMinterms === null || parsedDontCares === null) {
+    if (error) {
       setCanonicalForm(null);
       return;
     }
 
     setCanonicalForm(
-      normalizeFromMinterms(parsedMinterms, parsedDontCares, count, labels),
+      normalizeFromMinterms(mintermResult.parsed, dontCareResult.parsed, count, labels),
     );
-  }, [error, parsedMinterms, parsedDontCares, count, labels, setCanonicalForm]);
+  }, [error, mintermResult.parsed, dontCareResult.parsed, count, labels, setCanonicalForm]);
 
   return (
     <div className="space-y-6">
@@ -96,7 +98,7 @@ export function MintermInput() {
           <Input
             id="minterms"
             value={minterms}
-            onChange={(e) => handleMintermsChange(e.target.value)}
+            onChange={(e) => setMinterms(e.target.value)}
             placeholder="e.g., 0, 1, 2, 5, 8, 10"
             className="font-mono"
           />
@@ -112,7 +114,7 @@ export function MintermInput() {
           <Input
             id="dontcares"
             value={dontCares}
-            onChange={(e) => handleDontCaresChange(e.target.value)}
+            onChange={(e) => setDontCares(e.target.value)}
             placeholder="e.g., 3, 7"
             className="font-mono"
           />
@@ -129,12 +131,12 @@ export function MintermInput() {
             <AlertCircle className="w-4 h-4 text-destructive" />
             <span className="text-sm text-destructive">{error}</span>
           </>
-        ) : parsedMinterms && parsedMinterms.length > 0 ? (
+        ) : mintermResult.parsed.length > 0 ? (
           <>
             <CheckCircle className="w-4 h-4 text-step-complete" />
             <span className="text-sm text-muted-foreground">
-              F = Σm({parsedMinterms.join(', ')})
-              {parsedDontCares && parsedDontCares.length > 0 && ` + d(${parsedDontCares.join(', ')})`}
+              F = Σm({mintermResult.parsed.join(', ')})
+              {dontCareResult.parsed.length > 0 && ` + d(${dontCareResult.parsed.join(', ')})`}
             </span>
           </>
         ) : (
@@ -151,52 +153,31 @@ export function MaxtermInput() {
   
   const [maxterms, setMaxterms] = useState('');
   const [dontCares, setDontCares] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   const maxValue = Math.pow(2, count) - 1;
 
-  const validateInput = (value: string): number[] | null => {
-    if (!value.trim()) return [];
-    
-    const terms = value.split(',').map(s => s.trim()).filter(Boolean);
-    const parsed: number[] = [];
-    
-    for (const term of terms) {
-      const num = parseInt(term);
-      if (isNaN(num)) {
-        setError(`Invalid value: "${term}"`);
-        return null;
-      }
-      if (num < 0 || num > maxValue) {
-        setError(`Value ${num} out of range (0-${maxValue})`);
-        return null;
-      }
-      parsed.push(num);
-    }
-    
-    const unique = new Set(parsed);
-    if (unique.size !== parsed.length) {
-      setError('Duplicate values detected');
-      return null;
-    }
-    
-    setError(null);
-    return [...unique];
-  };
+  const maxtermResult = useMemo(() => parseTermList(maxterms, maxValue), [maxterms, maxValue]);
+  const dontCareResult = useMemo(() => parseTermList(dontCares, maxValue), [dontCares, maxValue]);
 
-  const parsedMaxterms = validateInput(maxterms);
-  const parsedDontCares = validateInput(dontCares);
+  const overlap = useMemo(() => {
+    const maxtermSet = new Set(maxtermResult.parsed);
+    return dontCareResult.parsed.find((term) => maxtermSet.has(term));
+  }, [maxtermResult.parsed, dontCareResult.parsed]);
+
+  const error = maxtermResult.error
+    ?? dontCareResult.error
+    ?? (overlap !== undefined ? `Value ${overlap} cannot be both maxterm and don't care` : null);
 
   useEffect(() => {
-    if (error || parsedMaxterms === null || parsedDontCares === null) {
+    if (error) {
       setCanonicalForm(null);
       return;
     }
 
     setCanonicalForm(
-      normalizeFromMaxterms(parsedMaxterms, parsedDontCares, count, labels),
+      normalizeFromMaxterms(maxtermResult.parsed, dontCareResult.parsed, count, labels),
     );
-  }, [error, parsedMaxterms, parsedDontCares, count, labels, setCanonicalForm]);
+  }, [error, maxtermResult.parsed, dontCareResult.parsed, count, labels, setCanonicalForm]);
 
   return (
     <div className="space-y-6">
@@ -223,7 +204,7 @@ export function MaxtermInput() {
           <Input
             id="maxterms"
             value={maxterms}
-            onChange={(e) => { setMaxterms(e.target.value); validateInput(e.target.value); }}
+            onChange={(e) => setMaxterms(e.target.value)}
             placeholder="e.g., 0, 2, 4, 6"
             className="font-mono"
           />
@@ -239,7 +220,7 @@ export function MaxtermInput() {
           <Input
             id="dc-maxterms"
             value={dontCares}
-            onChange={(e) => { setDontCares(e.target.value); validateInput(e.target.value); }}
+            onChange={(e) => setDontCares(e.target.value)}
             placeholder="e.g., 3, 7"
             className="font-mono"
           />
@@ -252,12 +233,12 @@ export function MaxtermInput() {
             <AlertCircle className="w-4 h-4 text-destructive" />
             <span className="text-sm text-destructive">{error}</span>
           </>
-        ) : parsedMaxterms && parsedMaxterms.length > 0 ? (
+        ) : maxtermResult.parsed.length > 0 ? (
           <>
             <CheckCircle className="w-4 h-4 text-step-complete" />
             <span className="text-sm text-muted-foreground">
-              F = ΠM({parsedMaxterms.join(', ')})
-              {parsedDontCares && parsedDontCares.length > 0 && ` · d(${parsedDontCares.join(', ')})`}
+              F = ΠM({maxtermResult.parsed.join(', ')})
+              {dontCareResult.parsed.length > 0 && ` · d(${dontCareResult.parsed.join(', ')})`}
             </span>
           </>
         ) : (

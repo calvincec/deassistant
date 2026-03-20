@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAppStore } from '@/store/appStore';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -44,30 +44,158 @@ export function ExpressionInput() {
     ? `(${a} + ${b})·(${a}' + ${c})·(${b} + ${c}')`
     : "(A + B)·(A' + C)·(B + C')";
 
-  const validateExpression = (): boolean => {
-    if (!expression.trim()) {
-      setError('Expression is empty');
-      return false;
+  const validateExpression = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return 'Expression is empty';
     }
 
-    // Check for balanced parentheses
+    const normalizedLabels = labels
+      .map((label) => label.trim())
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length);
+
+    if (!normalizedLabels.length) {
+      return 'Define at least one variable label';
+    }
+
+    const labelLookup = new Map(normalizedLabels.map((label) => [label.toLowerCase(), label]));
+    const allowedChars = /^[A-Za-z0-9_+·()'\s]*$/;
+    if (!allowedChars.test(value)) {
+      return 'Only variable names, +, ·, (, ), and apostrophe (\') are allowed';
+    }
+
+    type TokenType = 'label' | 'or' | 'and' | 'lparen' | 'rparen' | 'not';
+    type Token = { type: TokenType; raw: string };
+    const tokens: Token[] = [];
+
+    let i = 0;
+    while (i < value.length) {
+      const char = value[i];
+
+      if (/\s/.test(char)) {
+        i += 1;
+        continue;
+      }
+
+      if (char === '+') {
+        tokens.push({ type: 'or', raw: char });
+        i += 1;
+        continue;
+      }
+
+      if (char === '·') {
+        tokens.push({ type: 'and', raw: char });
+        i += 1;
+        continue;
+      }
+
+      if (char === '(') {
+        tokens.push({ type: 'lparen', raw: char });
+        i += 1;
+        continue;
+      }
+
+      if (char === ')') {
+        tokens.push({ type: 'rparen', raw: char });
+        i += 1;
+        continue;
+      }
+
+      if (char === "'") {
+        tokens.push({ type: 'not', raw: char });
+        i += 1;
+        continue;
+      }
+
+      if (/[A-Za-z0-9_]/.test(char)) {
+        let matchedLabel: string | null = null;
+        for (const label of normalizedLabels) {
+          if (value.slice(i, i + label.length).toLowerCase() === label.toLowerCase()) {
+            matchedLabel = labelLookup.get(label.toLowerCase()) ?? label;
+            break;
+          }
+        }
+
+        if (!matchedLabel) {
+          return `Unknown variable near "${value.slice(i, i + 8)}"`;
+        }
+
+        tokens.push({ type: 'label', raw: matchedLabel });
+        i += matchedLabel.length;
+        continue;
+      }
+
+      return `Invalid character "${char}"`;
+    }
+
+    if (!tokens.length) {
+      return 'Expression is empty';
+    }
+
     let balance = 0;
-    for (const char of expression) {
-      if (char === '(') balance++;
-      if (char === ')') balance--;
-      if (balance < 0) {
-        setError('Unbalanced parentheses');
-        return false;
+    const isOperandEnd = (type: TokenType) => type === 'label' || type === 'rparen' || type === 'not';
+    const isOperandStart = (type: TokenType) => type === 'label' || type === 'lparen';
+
+    for (let index = 0; index < tokens.length; index += 1) {
+      const current = tokens[index];
+      const prev = index > 0 ? tokens[index - 1] : null;
+      const next = index < tokens.length - 1 ? tokens[index + 1] : null;
+
+      if (current.type === 'lparen') {
+        balance += 1;
+        if (prev && isOperandEnd(prev.type)) {
+          // Implicit AND is allowed (e.g., A(B+C)).
+        }
+      }
+
+      if (current.type === 'rparen') {
+        balance -= 1;
+        if (balance < 0) {
+          return 'Unbalanced parentheses';
+        }
+        if (prev && (prev.type === 'or' || prev.type === 'and' || prev.type === 'lparen')) {
+          return 'Empty or invalid term inside parentheses';
+        }
+      }
+
+      if (current.type === 'or' || current.type === 'and') {
+        if (!prev || !next) {
+          return 'Expression cannot start or end with an operator';
+        }
+        if (!isOperandEnd(prev.type) || !isOperandStart(next.type)) {
+          return 'Invalid operator placement';
+        }
+      }
+
+      if (current.type === 'not') {
+        if (!prev || prev.type !== 'label') {
+          return "Apostrophe (') must come immediately after a variable";
+        }
+      }
+
+      if (current.type === 'label' && prev && prev.type === 'rparen') {
+        // Implicit AND is allowed (e.g., (A+B)C).
       }
     }
+
     if (balance !== 0) {
-      setError('Unbalanced parentheses');
-      return false;
+      return 'Unbalanced parentheses';
     }
 
-    setError(null);
-    return true;
+    const lastToken = tokens[tokens.length - 1];
+    if (lastToken.type === 'or' || lastToken.type === 'and' || lastToken.type === 'lparen') {
+      return 'Expression cannot end with an operator or open parenthesis';
+    }
+
+    return null;
   };
+
+  const validationError = useMemo(() => validateExpression(expression), [expression, labels]);
+
+  useEffect(() => {
+    setError(validationError);
+  }, [validationError]);
 
   useEffect(() => {
     if (!expression.trim()) {
@@ -75,7 +203,7 @@ export function ExpressionInput() {
       return;
     }
 
-    if (!validateExpression()) {
+    if (validationError) {
       setCanonicalForm(null);
       return;
     }
@@ -83,7 +211,7 @@ export function ExpressionInput() {
     setCanonicalForm(
       normalizeFromExpression(expression, count, labels, format === 'SOP'),
     );
-  }, [expression, format, count, labels, setCanonicalForm]);
+  }, [expression, format, count, labels, setCanonicalForm, validationError]);
 
   return (
     <div className="space-y-6">
@@ -147,7 +275,6 @@ export function ExpressionInput() {
           id="expression"
           value={expression}
           onChange={(e) => setExpression(e.target.value)}
-          onBlur={validateExpression}
           placeholder={format === 'SOP' 
             ? `e.g., ${sopExample}`
             : `e.g., ${posExample}`}
