@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Play, RotateCcw } from 'lucide-react';
 import { KMapVisualizer } from '@/components/kmap/KMapVisualizer';
 import { QMCVisualizer } from '@/components/qmc/QMCVisualizer';
 import { ResultsPanel } from '@/components/results/ResultsPanel';
+import { CircuitDiagramPanel } from '@/components/circuit/CircuitDiagramPanel';
 import { KMapStep, QMCStep } from '@/types/logic';
 
 export function StepByStepViewer() {
@@ -131,13 +132,18 @@ export function StepByStepViewer() {
 
       {/* Results Panel (always visible) */}
       {isLastStep && (
-        <ResultsPanel
-          expression={result.expression}
-          implicants={result.implicants}
-          essentialImplicants={result.essentialImplicants}
-          variableLabels={canonicalForm.variableLabels}
-          outputFormat={outputFormat}
-        />
+        <>
+          <ResultsPanel
+            expression={result.expression}
+            implicants={result.implicants}
+            essentialImplicants={result.essentialImplicants}
+            variableLabels={canonicalForm.variableLabels}
+            outputFormat={outputFormat}
+          />
+
+          {/* Circuit Diagram - only at last step */}
+          <CircuitDiagramPanel />
+        </>
       )}
     </div>
   );
