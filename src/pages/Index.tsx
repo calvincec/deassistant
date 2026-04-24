@@ -11,7 +11,7 @@ import { StepByStepViewer } from '@/components/results/StepByStepViewer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Play, RotateCcw, Cpu, BookOpen } from 'lucide-react';
+import { Play, RotateCcw, Cpu, BookOpen, ArrowLeft } from 'lucide-react';
 import { solveKMap } from '@/logic/kmap/kmapSolver';
 import { solveQMC } from '@/logic/qmc/qmcSolver';
 import { useToast } from '@/hooks/use-toast';
@@ -37,6 +37,7 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [inputResetKey, setInputResetKey] = useState(0);
+  const [isSolutionViewOpen, setIsSolutionViewOpen] = useState(false);
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -79,6 +80,7 @@ const Index = () => {
         : solveQMC(canonicalForm, outputFormat);
       
       setResult(solverResult);
+      setIsSolutionViewOpen(true);
       
       toast({
         title: 'Simplification Complete',
@@ -100,6 +102,7 @@ const Index = () => {
     setResult(null);
     setCurrentStep(0);
     setInputResetKey((prev) => prev + 1);
+    setIsSolutionViewOpen(false);
     toast({ title: 'Function Input Reset', description: 'Function input has been cleared' });
   };
 
@@ -116,6 +119,7 @@ const Index = () => {
     setCanonicalForm(null);
     setResult(null);
     setCurrentStep(0);
+    setIsSolutionViewOpen(false);
 
     toast({
       title: 'Configuration Reset',
@@ -132,6 +136,10 @@ const Index = () => {
       case 'expression': return <ExpressionInput />;
       default: return <KMapInput />;
     }
+  };
+
+  const handleBackToInputView = () => {
+    setIsSolutionViewOpen(false);
   };
 
   return (
@@ -165,77 +173,88 @@ const Index = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column: Configuration */}
-          <div className="space-y-6">
-            <VariableConfigPanel />
-            
+        {isSolutionViewOpen && result ? (
+          <div className="max-w-5xl mx-auto space-y-6">
+            <Button
+              variant="outline"
+              onClick={handleBackToInputView}
+              className="gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Input
+            </Button>
+
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Solver Options</CardTitle>
+                <CardTitle className="text-lg">Step-by-Step Solution</CardTitle>
               </CardHeader>
               <CardContent>
-                <SolverSelector />
+                <StepByStepViewer />
               </CardContent>
             </Card>
           </div>
+        ) : (
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Left Column: Configuration */}
+            <div className="space-y-6">
+              <VariableConfigPanel />
 
-          {/* Middle Column: Input */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Function Input</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <InputMethodSelector />
-                <Separator />
-                <div key={`${inputMethod}-${inputResetKey}`}>
-                  {renderInputComponent()}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Action Buttons */}
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Button
-                onClick={handleSolve}
-                disabled={isProcessing}
-                className="h-12 text-lg gap-2 sm:col-span-3"
-              >
-                <Play className="w-5 h-5" />
-                {isProcessing ? 'Processing...' : 'Solve'}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleResetFunctionInput}
-                className="h-12 gap-2"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Reset Function Input
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleResetConfigAndSolver}
-                className="h-12 gap-2 sm:col-span-2"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Reset solver & variable config
-              </Button>
-            </div>
-
-            {/* Results */}
-            {result && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Step-by-Step Solution</CardTitle>
+                  <CardTitle className="text-lg">Solver Options</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <StepByStepViewer />
+                  <SolverSelector />
                 </CardContent>
               </Card>
-            )}
+
+            </div>
+
+            {/* Middle Column: Input */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Function Input</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <InputMethodSelector />
+                  <Separator />
+                  <div key={`${inputMethod}-${inputResetKey}`}>
+                    {renderInputComponent()}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Action Buttons */}
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Button
+                  onClick={handleSolve}
+                  disabled={isProcessing}
+                  className="h-12 text-lg gap-2 sm:col-span-3"
+                >
+                  <Play className="w-5 h-5" />
+                  {isProcessing ? 'Processing...' : 'Solve'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleResetFunctionInput}
+                  className="h-12 gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset Function Input
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleResetConfigAndSolver}
+                  className="h-12 gap-2 sm:col-span-2"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset solver & variable config
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Footer */}

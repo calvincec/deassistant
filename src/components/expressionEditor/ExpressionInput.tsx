@@ -59,7 +59,6 @@ export function ExpressionInput() {
       return 'Define at least one variable label';
     }
 
-    const labelLookup = new Map(normalizedLabels.map((label) => [label.toLowerCase(), label]));
     const allowedChars = /^[A-Za-z0-9_+·()'\s]*$/;
     if (!allowedChars.test(value)) {
       return 'Only variable names, +, ·, (, ), and apostrophe (\') are allowed';
@@ -111,8 +110,8 @@ export function ExpressionInput() {
       if (/[A-Za-z0-9_]/.test(char)) {
         let matchedLabel: string | null = null;
         for (const label of normalizedLabels) {
-          if (value.slice(i, i + label.length).toLowerCase() === label.toLowerCase()) {
-            matchedLabel = labelLookup.get(label.toLowerCase()) ?? label;
+          if (value.slice(i, i + label.length) === label) {
+            matchedLabel = label;
             break;
           }
         }

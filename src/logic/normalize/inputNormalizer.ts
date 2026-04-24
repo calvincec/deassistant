@@ -132,7 +132,7 @@ export function normalizeFromExpression(
   for (let i = 0; i < totalMinterms; i++) {
     const values: Record<string, boolean> = {};
     variableLabels.forEach((label, idx) => {
-      values[label.toUpperCase()] = Boolean((i >> (variableCount - 1 - idx)) & 1);
+      values[label] = Boolean((i >> (variableCount - 1 - idx)) & 1);
     });
 
     const result = evaluateExpression(cleanExpr, values, variableLabels);
@@ -170,10 +170,6 @@ function evaluateExpression(
     .sort((a, b) => b.length - a.length);
 
   if (!normalizedLabels.length) return false;
-
-  const labelLookup = new Map(
-    normalizedLabels.map((label) => [label.toLowerCase(), label.toUpperCase()])
-  );
 
   const tokens: Token[] = [];
   let i = 0;
@@ -215,8 +211,8 @@ function evaluateExpression(
     if (/[A-Za-z0-9_]/.test(ch)) {
       let matchedLabel: string | null = null;
       for (const label of normalizedLabels) {
-        if (source.slice(i, i + label.length).toLowerCase() === label.toLowerCase()) {
-          matchedLabel = labelLookup.get(label.toLowerCase()) ?? label.toUpperCase();
+        if (source.slice(i, i + label.length) === label) {
+          matchedLabel = label;
           break;
         }
       }
