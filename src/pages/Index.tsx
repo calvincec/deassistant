@@ -241,8 +241,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-border mt-16 py-8">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>Interactive Digital Electronics Assistant — An educational tool for Boolean function minimization</p>
-          <p className="mt-1">Supports K-Map and Quine-McCluskey algorithms with step-by-step explanations</p>
+          <p>Supports K-Map and Quine-McCluskey algorithms with step-by-step explanations</p>
         </div>
       </footer>
     </div>
