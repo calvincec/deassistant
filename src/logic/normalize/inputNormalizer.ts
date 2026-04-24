@@ -158,51 +158,161 @@ function evaluateExpression(
   values: Record<string, boolean>,
   variableLabels: string[]
 ): boolean {
-  // Simple parser for SOP/POS expressions
-  // Supports: +, *, ', (), variable names
-  
-  let processed = expr
-    .replace(/\s+/g, '')
-    .replace(/·/g, '*')
-    .replace(/\+/g, '|')
-    .replace(/\*/g, '&');
+  type TokenType = 'var' | 'or' | 'and' | 'lparen' | 'rparen' | 'not';
+  interface Token {
+    type: TokenType;
+    value?: string;
+  }
 
   const normalizedLabels = variableLabels
-    .map(label => label.trim())
+    .map((label) => label.trim())
     .filter(Boolean)
     .sort((a, b) => b.length - a.length);
 
-  // Handle NOT operations (A' or Ā)
-  normalizedLabels.forEach((label) => {
-    const escapedLabel = escapeRegExp(label);
-    const upperLabel = label.toUpperCase();
-    const regex = new RegExp(`(?<![A-Za-z0-9_])${escapedLabel}'(?![A-Za-z0-9_])`, 'gi');
-    processed = processed.replace(regex, `(!${upperLabel})`);
-  });
+  if (!normalizedLabels.length) return false;
 
-  // Replace variables with their values
-  normalizedLabels.forEach((label) => {
-    const escapedLabel = escapeRegExp(label);
-    const upperLabel = label.toUpperCase();
-    const regex = new RegExp(`(?<![A-Za-z0-9_])${escapedLabel}(?![A-Za-z0-9_])`, 'gi');
-    processed = processed.replace(regex, values[upperLabel] ? 'true' : 'false');
-  });
+  const labelLookup = new Map(
+    normalizedLabels.map((label) => [label.toLowerCase(), label.toUpperCase()])
+  );
 
-  // Handle implicit AND (adjacent terms without operator)
-  processed = processed.replace(/\)\(/g, ')&(');
-  processed = processed.replace(/true\(/g, 'true&(');
-  processed = processed.replace(/false\(/g, 'false&(');
-  processed = processed.replace(/\)true/g, ')&true');
-  processed = processed.replace(/\)false/g, ')&false');
-  processed = processed.replace(/truefalse/g, 'true&false');
-  processed = processed.replace(/falsetrue/g, 'false&true');
-  processed = processed.replace(/truetrue/g, 'true&true');
-  processed = processed.replace(/falsefalse/g, 'false&false');
+  const tokens: Token[] = [];
+  let i = 0;
+  const source = expr.replace(/\s+/g, '');
+
+  while (i < source.length) {
+    const ch = source[i];
+
+    if (ch === '+') {
+      tokens.push({ type: 'or' });
+      i += 1;
+      continue;
+    }
+
+    if (ch === '·' || ch === '*') {
+      tokens.push({ type: 'and' });
+      i += 1;
+      continue;
+    }
+
+    if (ch === '(') {
+      tokens.push({ type: 'lparen' });
+      i += 1;
+      continue;
+    }
+
+    if (ch === ')') {
+      tokens.push({ type: 'rparen' });
+      i += 1;
+      continue;
+    }
+
+    if (ch === "'") {
+      tokens.push({ type: 'not' });
+      i += 1;
+      continue;
+    }
+
+    if (/[A-Za-z0-9_]/.test(ch)) {
+      let matchedLabel: string | null = null;
+      for (const label of normalizedLabels) {
+        if (source.slice(i, i + label.length).toLowerCase() === label.toLowerCase()) {
+          matchedLabel = labelLookup.get(label.toLowerCase()) ?? label.toUpperCase();
+          break;
+        }
+      }
+
+      if (!matchedLabel) {
+        return false;
+      }
+
+      tokens.push({ type: 'var', value: matchedLabel });
+      i += matchedLabel.length;
+      continue;
+    }
+
+    return false;
+  }
+
+  let index = 0;
+
+  const canEndTerm = (token: Token | null): boolean => {
+    if (!token) return false;
+    return token.type === 'var' || token.type === 'rparen' || token.type === 'not';
+  };
+
+  const canStartTerm = (token: Token | null): boolean => {
+    if (!token) return false;
+    return token.type === 'var' || token.type === 'lparen';
+  };
+
+  const parseExpression = (): boolean => {
+    let left = parseTerm();
+
+    while (index < tokens.length && tokens[index].type === 'or') {
+      index += 1;
+      const right = parseTerm();
+      left = left || right;
+    }
+
+    return left;
+  };
+
+  const parseTerm = (): boolean => {
+    let left = parseFactor();
+
+    while (index < tokens.length) {
+      const current = tokens[index];
+      const previous = index > 0 ? tokens[index - 1] : null;
+      const explicitAnd = current.type === 'and';
+      const implicitAnd = !explicitAnd && canEndTerm(previous) && canStartTerm(current);
+
+      if (!explicitAnd && !implicitAnd) break;
+
+      if (explicitAnd) {
+        index += 1;
+      }
+
+      const right = parseFactor();
+      left = left && right;
+    }
+
+    return left;
+  };
+
+  const parseFactor = (): boolean => {
+    let value: boolean;
+    const token = tokens[index];
+
+    if (!token) {
+      throw new Error('Unexpected end of expression');
+    }
+
+    if (token.type === 'var') {
+      value = Boolean(values[token.value ?? '']);
+      index += 1;
+    } else if (token.type === 'lparen') {
+      index += 1;
+      value = parseExpression();
+      if (!tokens[index] || tokens[index].type !== 'rparen') {
+        throw new Error('Missing closing parenthesis');
+      }
+      index += 1;
+    } else {
+      throw new Error('Invalid factor');
+    }
+
+    while (index < tokens.length && tokens[index].type === 'not') {
+      value = !value;
+      index += 1;
+    }
+
+    return value;
+  };
 
   try {
-    // Safe evaluation using Function constructor
-    const evalFunc = new Function(`return ${processed};`);
-    return Boolean(evalFunc());
+    const result = parseExpression();
+    if (index !== tokens.length) return false;
+    return result;
   } catch {
     return false;
   }

@@ -8,6 +8,7 @@ import { KMapVisualizer } from '@/components/kmap/KMapVisualizer';
 import { QMCVisualizer } from '@/components/qmc/QMCVisualizer';
 import { ResultsPanel } from '@/components/results/ResultsPanel';
 import { CircuitDiagramPanel } from '@/components/circuit/CircuitDiagramPanel';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { KMapStep, QMCStep } from '@/types/logic';
 
 export function StepByStepViewer() {
@@ -56,12 +57,23 @@ export function StepByStepViewer() {
       {/* Current Step Content */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="text-xl">{currentStepData.title}</span>
-            <span className="text-sm text-muted-foreground font-normal">
+          <div className="flex items-center justify-between gap-4">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold truncate">
+                    {currentStepData.title}
+                  </h3>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-sm">
+                {currentStepData.title}
+              </TooltipContent>
+            </Tooltip>
+            <span className="text-sm text-muted-foreground font-normal flex-shrink-0 whitespace-nowrap">
               Step {currentStep + 1} of {steps.length}
             </span>
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {solverMethod === 'kmap' ? (
