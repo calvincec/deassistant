@@ -47,7 +47,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   setVariableConfig: (config) => set((state) => {
     const requestedCount = config.count ?? state.variableConfig.count;
-    const shouldClampForKMap = state.solverMethod === 'kmap' || state.inputMethod === 'kmap';
+    const shouldClampForKMap = state.solverMethod === 'kmap';
     const count = shouldClampForKMap ? Math.min(requestedCount, 6) : requestedCount;
     const hasExplicitLabels = Object.prototype.hasOwnProperty.call(config, 'labels');
     const labelsSource = config.labels ?? state.variableConfig.labels;
@@ -68,22 +68,31 @@ export const useAppStore = create<AppStore>((set, get) => ({
     };
   }),
 
-  setInputMethod: (method) => set((state) => ({
-    inputMethod: method,
-    variableConfig: method === 'kmap' && state.variableConfig.count > 6
-      ? {
-          ...state.variableConfig,
-          count: 6,
-          labels: generateVariableLabels(6, state.variableConfig.labels),
-        }
-      : state.variableConfig,
-    canonicalForm: null,
-    result: null,
-    currentStep: 0,
-  })),
+  setInputMethod: (method) => set((state) => {
+    const nextMethod = state.solverMethod === 'qmc' && method === 'kmap'
+      ? 'minterms'
+      : method;
+
+    return {
+      inputMethod: nextMethod,
+      variableConfig: nextMethod === 'kmap' && state.variableConfig.count > 6
+        ? {
+            ...state.variableConfig,
+            count: 6,
+            labels: generateVariableLabels(6, state.variableConfig.labels),
+          }
+        : state.variableConfig,
+      canonicalForm: null,
+      result: null,
+      currentStep: 0,
+    };
+  }),
 
   setSolverMethod: (method) => set((state) => ({
     solverMethod: method,
+    inputMethod: method === 'qmc' && state.inputMethod === 'kmap'
+      ? 'minterms'
+      : state.inputMethod,
     variableConfig: method === 'kmap' && state.variableConfig.count > 6
       ? {
           ...state.variableConfig,

@@ -1,6 +1,5 @@
 import React from 'react';
 import { useAppStore } from '@/store/appStore';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Grid3X3, Table, FileText, Hash, Binary } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { InputMethod } from '@/types/logic';
@@ -39,13 +38,16 @@ const inputMethods: { id: InputMethod; label: string; icon: React.ReactNode; des
 ];
 
 export function InputMethodSelector() {
-  const { inputMethod, setInputMethod } = useAppStore();
+  const { inputMethod, solverMethod, setInputMethod } = useAppStore();
+  const visibleMethods = solverMethod === 'qmc'
+    ? inputMethods.filter((method) => method.id !== 'kmap')
+    : inputMethods;
 
   return (
     <div className="space-y-4">
       <h3 className="font-semibold text-foreground">Input Method</h3>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {inputMethods.map((method) => (
+        {visibleMethods.map((method) => (
           <button
             key={method.id}
             onClick={() => setInputMethod(method.id)}

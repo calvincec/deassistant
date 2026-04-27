@@ -135,7 +135,7 @@ const Index = () => {
       case 'minterms': return <MintermInput />;
       case 'maxterms': return <MaxtermInput />;
       case 'expression': return <ExpressionInput />;
-      default: return <KMapInput />;
+      default: return <MintermInput />;
     }
   };
 
