@@ -2,32 +2,48 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/store/appStore';
 import { CellValue } from '@/types/logic';
 import { cn } from '@/lib/utils';
-import { getGrayCodeOrder, normalizeFromKMap } from '@/logic/normalize/inputNormalizer';
+import {
+  getGrayCodeOrder,
+  getKMapDimensions,
+  getKMapCellMinterm,
+  normalizeFromKMap,
+} from '@/logic/normalize/inputNormalizer';
 
 export function KMapInput() {
   const { variableConfig, setCanonicalForm } = useAppStore();
   const { count, labels, defaultOutput } = variableConfig;
   
   const [grid, setGrid] = useState<CellValue[][]>([]);
+  const { rows, cols, rowBits, colBits } = getKMapDimensions(count);
 
   // Initialize grid based on variable count
   useEffect(() => {
-    const rows = count <= 3 ? 2 : 4;
-    const cols = count === 2 ? 2 : 4;
     const newGrid: CellValue[][] = Array(rows)
       .fill(null)
       .map(() => Array(cols).fill(defaultOutput as CellValue));
     setGrid(newGrid);
-  }, [count, defaultOutput]);
+  }, [rows, cols, defaultOutput, count]);
 
   useEffect(() => {
     if (!grid.length) return;
 
+    const hasExpectedShape =
+      grid.length === rows && grid.every((row) => row.length === cols);
+
+    if (!hasExpectedShape) return;
+
     setCanonicalForm(normalizeFromKMap(grid, count, labels));
-  }, [grid, count, labels, setCanonicalForm]);
+  }, [grid, count, labels, rows, cols, setCanonicalForm]);
 
   const handleCellClick = (row: number, col: number) => {
-    const newGrid = [...grid.map(r => [...r])];
+    const baseGrid: CellValue[][] =
+      grid.length === rows && grid.every((r) => r.length === cols)
+        ? grid
+        : Array(rows)
+            .fill(null)
+            .map(() => Array(cols).fill(defaultOutput as CellValue));
+
+    const newGrid = [...baseGrid.map(r => [...r])];
     const currentValue = newGrid[row][col];
     // Cycle: 0 -> 1 -> X -> 0
     if (currentValue === 0) newGrid[row][col] = 1;
@@ -37,31 +53,25 @@ export function KMapInput() {
   };
 
   const getRowLabels = (): string[] => {
-    if (count === 2) return ['0', '1'];
-    if (count === 3) return ['0', '1'];
-    return ['00', '01', '11', '10'];
+    return getGrayCodeOrder(rowBits)
+      .map((value) => value.toString(2).padStart(rowBits, '0'));
   };
 
   const getColLabels = (): string[] => {
-    if (count === 2) return ['0', '1'];
-    return ['00', '01', '11', '10'];
+    return getGrayCodeOrder(colBits)
+      .map((value) => value.toString(2).padStart(colBits, '0'));
   };
 
   const getRowVarLabel = (): string => {
-    if (count === 2) return labels[0];
-    if (count === 3) return labels[0];
-    return labels.slice(0, 2).join('');
+    return labels.slice(0, rowBits).join('');
   };
 
   const getColVarLabel = (): string => {
-    if (count === 2) return labels[1];
-    if (count === 3) return labels.slice(1).join('');
-    return labels.slice(2).join('');
+    return labels.slice(rowBits).join('');
   };
 
   const rowLabels = getRowLabels();
   const colLabels = getColLabels();
-  const grayCode = getGrayCodeOrder(count);
 
   return (
     <div className="space-y-4">
@@ -98,14 +108,14 @@ export function KMapInput() {
 
             {/* Row labels and cells */}
             <div>
-              {grid.map((row, rowIndex) => (
+              {Array.from({ length: rows }).map((_, rowIndex) => (
                 <div key={rowIndex} className="flex">
                   <div className="w-8 h-12 flex items-center justify-center font-mono text-sm font-medium text-muted-foreground">
                     {rowLabels[rowIndex]}
                   </div>
-                  {row.map((cell, colIndex) => {
-                    const mintermIndex = rowIndex * row.length + colIndex;
-                    const minterm = grayCode[mintermIndex];
+                  {Array.from({ length: cols }).map((_, colIndex) => {
+                    const cell = grid[rowIndex]?.[colIndex] ?? (defaultOutput as CellValue);
+                    const minterm = getKMapCellMinterm(rowIndex, colIndex, count);
                     return (
                       <button
                         key={colIndex}
@@ -159,9 +169,7 @@ export function KMapInput() {
 export function useKMapGrid() {
   const { variableConfig } = useAppStore();
   const { count, defaultOutput } = variableConfig;
-  
-  const rows = count <= 3 ? 2 : 4;
-  const cols = count === 2 ? 2 : 4;
+  const { rows, cols } = getKMapDimensions(count);
   
   return Array(rows).fill(null).map(() => Array(cols).fill(defaultOutput as CellValue));
 }

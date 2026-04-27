@@ -1,6 +1,8 @@
 import React from 'react';
 import { useAppStore } from '@/store/appStore';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
@@ -8,32 +10,123 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Settings2 } from 'lucide-react';
+import { generateVariableLabels } from '@/logic/normalize/inputNormalizer';
 
 export function VariableConfigPanel() {
-  const { variableConfig, setVariableConfig } = useAppStore();
+  const { variableConfig, solverMethod, setVariableConfig } = useAppStore();
+  const isKMapSolver = solverMethod === 'kmap';
+  const [countInput, setCountInput] = React.useState(variableConfig.count.toString());
 
-  const getDefaultLabel = (index: number) => {
-    if (index < 26) {
-      return String.fromCharCode(65 + index);
+  React.useEffect(() => {
+    setCountInput(variableConfig.count.toString());
+  }, [variableConfig.count]);
+
+  const applyCount = (value: string, options?: { min?: number; max?: number; fallback?: number }) => {
+    if (!value.trim()) return;
+
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return;
+
+    const min = options?.min ?? 1;
+    const max = options?.max;
+    const fallback = options?.fallback;
+    let count = Math.max(min, parsed);
+
+    if (max !== undefined) {
+      count = Math.min(count, max);
     }
-    return `V${index + 1}`;
-  };
 
-  const handleCountChange = (value: string) => {
-    const count = parseInt(value);
-    const nextLabels = Array.from({ length: count }, (_, index) => {
-      const existing = variableConfig.labels[index]?.trim();
-      return existing || getDefaultLabel(index);
-    });
+    if (!Number.isFinite(count) && fallback !== undefined) {
+      count = fallback;
+    }
 
     setVariableConfig({
       count,
-      labels: nextLabels,
+      labels: generateVariableLabels(count, variableConfig.labels),
     });
+  };
+
+  const handleCountInputChange = (value: string) => {
+    // Accept only digits; reject e, +, -, decimal points, and whitespace.
+    if (!/^\d*$/.test(value)) return;
+
+    setCountInput(value);
+  };
+
+  const handleCountBlur = () => {
+    if (!countInput.trim()) {
+      setCountInput('4');
+      applyCount('4', { min: 1, fallback: 4 });
+      return;
+    }
+
+    const parsed = Number.parseInt(countInput, 10);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setCountInput('4');
+      applyCount('4', { min: 1, fallback: 4 });
+      return;
+    }
+
+    applyCount(countInput, { min: 1 });
+  };
+
+  const handleQMCKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
+    const allowedKeys = new Set([
+      'Backspace',
+      'Delete',
+      'Tab',
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowUp',
+      'ArrowDown',
+      'Home',
+      'End',
+      'Enter',
+    ]);
+
+    if (allowedKeys.has(e.key)) {
+      if (e.key === 'Enter') {
+        handleCountBlur();
+      }
+      return;
+    }
+
+    if (/^\d$/.test(e.key)) {
+      return;
+    }
+
+    e.preventDefault();
+
+    if (!countInput.trim()) {
+      setCountInput('4');
+      applyCount('4', { min: 1, fallback: 4 });
+    }
+  };
+
+  const handleQMCStepApply = (value: string) => {
+    if (!value.trim()) {
+      setCountInput('4');
+      applyCount('4', { min: 1, fallback: 4 });
+      return;
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setCountInput('4');
+      applyCount('4', { min: 1, fallback: 4 });
+      return;
+    }
+
+    applyCount(value, { min: 1 });
+  };
+
+  const handleQMCWheel: React.WheelEventHandler<HTMLInputElement> = (e) => {
+    if (!countInput.trim()) {
+      e.preventDefault();
+      setCountInput('4');
+      applyCount('4', { min: 1, fallback: 4 });
+    }
   };
 
   const handleLabelChange = (index: number, value: string) => {
@@ -48,7 +141,7 @@ export function VariableConfigPanel() {
     if (current) return;
 
     const newLabels = [...variableConfig.labels];
-    newLabels[index] = getDefaultLabel(index);
+    newLabels[index] = generateVariableLabels(index + 1)[index];
     setVariableConfig({ labels: newLabels });
   };
 
@@ -74,16 +167,50 @@ export function VariableConfigPanel() {
           <Label htmlFor="varCount" className="text-sm font-medium">
             Number of Variables
           </Label>
-          <Select value={variableConfig.count.toString()} onValueChange={handleCountChange}>
-            <SelectTrigger id="varCount" className="w-full">
-              <SelectValue placeholder="Select variable count" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2">2 Variables</SelectItem>
-              <SelectItem value="3">3 Variables</SelectItem>
-              <SelectItem value="4">4 Variables</SelectItem>
-            </SelectContent>
-          </Select>
+          {isKMapSolver ? (
+            <Select
+              value={Math.min(Math.max(variableConfig.count, 1), 6).toString()}
+              onValueChange={(value) => {
+                applyCount(value, { min: 1, max: 6, fallback: 4 });
+                setCountInput(value);
+              }}
+            >
+              <SelectTrigger id="varCount" className="w-full">
+                <SelectValue placeholder="Select variable count" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">1</SelectItem>
+                <SelectItem value="2">2</SelectItem>
+                <SelectItem value="3">3</SelectItem>
+                <SelectItem value="4">4</SelectItem>
+                <SelectItem value="5">5</SelectItem>
+                <SelectItem value="6">6</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              id="varCount"
+              type="number"
+              min={1}
+              step={1}
+              value={countInput}
+              onChange={(e) => {
+                handleCountInputChange(e.target.value);
+                if (e.nativeEvent instanceof InputEvent && e.nativeEvent.inputType === 'insertReplacementText') {
+                  handleQMCStepApply(e.target.value);
+                }
+              }}
+              onBlur={handleCountBlur}
+              onFocus={(e) => e.currentTarget.select()}
+              onKeyDown={handleQMCKeyDown}
+              onWheel={handleQMCWheel}
+            />
+          )}
+          <p className="text-xs text-muted-foreground">
+            {isKMapSolver
+              ? 'K-map solver allows selecting 1 to 6 variables.'
+              : 'QMC accepts positive integers only. Empty or invalid input defaults to 4.'}
+          </p>
         </div>
 
         {/* Variable Labels */}
@@ -96,13 +223,15 @@ export function VariableConfigPanel() {
                 value={label}
                 onChange={(e) => handleLabelChange(index, e.target.value)}
                 onBlur={() => handleLabelBlur(index)}
+                onFocus={(e) => e.currentTarget.select()}
                 className="w-24 text-center font-mono"
-                maxLength={8}
+                maxLength={16}
+                placeholder={generateVariableLabels(index + 1)[index]}
               />
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
-            You may Customize the variable names (e.g., A, B, C, D or w, x, y, z)
+            Labels default to A, B, C, D, ... Z, AA, AB, AC and continue as needed.
           </p>
         </div>
 

@@ -13,12 +13,15 @@ export function normalizeFromKMap(
   const minterms: number[] = [];
   const maxterms: number[] = [];
   const dontCares: number[] = [];
-
-  const grayCode = getGrayCodeOrder(variableCount);
+  const { rowBits, colBits } = getKMapDimensions(variableCount);
+  const rowGray = getGrayCodeOrder(rowBits);
+  const colGray = getGrayCodeOrder(colBits);
   
   grid.forEach((row, rowIndex) => {
     row.forEach((cell, colIndex) => {
-      const minterm = grayCode[rowIndex * row.length + colIndex];
+      const rowBinary = rowGray[rowIndex].toString(2).padStart(rowBits, '0');
+      const colBinary = colGray[colIndex].toString(2).padStart(colBits, '0');
+      const minterm = parseInt(`${rowBinary}${colBinary}`, 2);
       if (cell === 1) {
         minterms.push(minterm);
       } else if (cell === 0) {
@@ -341,6 +344,75 @@ export function getGrayCodeOrder(variableCount: number): number[] {
   }
   
   return result;
+}
+
+export function generateVariableLabels(count: number, existingLabels: string[] = []): string[] {
+  return Array.from({ length: count }, (_, index) => {
+    const existing = existingLabels[index]?.trim();
+    return existing || getAlphabeticLabel(index);
+  });
+}
+
+export function getKMapDimensions(variableCount: number): {
+  rowBits: number;
+  colBits: number;
+  rows: number;
+  cols: number;
+} {
+  const rowBits = Math.floor(variableCount / 2);
+  const colBits = variableCount - rowBits;
+
+  return {
+    rowBits,
+    colBits,
+    rows: Math.pow(2, rowBits),
+    cols: Math.pow(2, colBits),
+  };
+}
+
+export function getKMapCellMinterm(
+  rowIndex: number,
+  colIndex: number,
+  variableCount: number
+): number {
+  const { rowBits, colBits } = getKMapDimensions(variableCount);
+  const rowGray = getGrayCodeOrder(rowBits);
+  const colGray = getGrayCodeOrder(colBits);
+
+  const rowBinary = rowGray[rowIndex].toString(2).padStart(rowBits, '0');
+  const colBinary = colGray[colIndex].toString(2).padStart(colBits, '0');
+
+  return parseInt(`${rowBinary}${colBinary}`, 2);
+}
+
+export function getKMapCellPosition(minterm: number, variableCount: number): {
+  rowIndex: number;
+  colIndex: number;
+} {
+  const { rowBits, colBits } = getKMapDimensions(variableCount);
+  const rowGray = getGrayCodeOrder(rowBits);
+  const colGray = getGrayCodeOrder(colBits);
+  const binary = mintermToBinary(minterm, variableCount);
+  const rowBinary = binary.slice(0, rowBits);
+  const colBinary = binary.slice(rowBits);
+
+  return {
+    rowIndex: rowGray.indexOf(parseInt(rowBinary || '0', 2)),
+    colIndex: colGray.indexOf(parseInt(colBinary || '0', 2)),
+  };
+}
+
+function getAlphabeticLabel(index: number): string {
+  let value = index + 1;
+  let label = '';
+
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    label = String.fromCharCode(65 + remainder) + label;
+    value = Math.floor((value - 1) / 26);
+  }
+
+  return label;
 }
 
 export function mintermToBinary(minterm: number, variableCount: number): string {

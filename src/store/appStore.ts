@@ -8,6 +8,7 @@ import {
   CanonicalForm,
   SolverResult 
 } from '@/types/logic';
+import { generateVariableLabels } from '@/logic/normalize/inputNormalizer';
 
 interface AppStore extends AppState {
   // Actions
@@ -26,7 +27,7 @@ interface AppStore extends AppState {
 
 const defaultVariableConfig: VariableConfig = {
   count: 4,
-  labels: ['A', 'B', 'C', 'D'],
+  labels: generateVariableLabels(4),
   defaultOutput: 0,
 };
 
@@ -44,25 +45,55 @@ const initialState: AppState = {
 export const useAppStore = create<AppStore>((set, get) => ({
   ...initialState,
 
-  setVariableConfig: (config) => set((state) => ({
-    variableConfig: { ...state.variableConfig, ...config },
+  setVariableConfig: (config) => set((state) => {
+    const requestedCount = config.count ?? state.variableConfig.count;
+    const shouldClampForKMap = state.solverMethod === 'kmap' || state.inputMethod === 'kmap';
+    const count = shouldClampForKMap ? Math.min(requestedCount, 6) : requestedCount;
+    const hasExplicitLabels = Object.prototype.hasOwnProperty.call(config, 'labels');
+    const labelsSource = config.labels ?? state.variableConfig.labels;
+    const labels = hasExplicitLabels
+      ? labelsSource
+      : generateVariableLabels(count, labelsSource);
+
+    return {
+      variableConfig: {
+        ...state.variableConfig,
+        ...config,
+        count,
+        labels,
+      },
+      canonicalForm: null,
+      result: null,
+      currentStep: 0,
+    };
+  }),
+
+  setInputMethod: (method) => set((state) => ({
+    inputMethod: method,
+    variableConfig: method === 'kmap' && state.variableConfig.count > 6
+      ? {
+          ...state.variableConfig,
+          count: 6,
+          labels: generateVariableLabels(6, state.variableConfig.labels),
+        }
+      : state.variableConfig,
     canonicalForm: null,
     result: null,
     currentStep: 0,
   })),
 
-  setInputMethod: (method) => set({
-    inputMethod: method,
-    canonicalForm: null,
-    result: null,
-    currentStep: 0,
-  }),
-
-  setSolverMethod: (method) => set({
+  setSolverMethod: (method) => set((state) => ({
     solverMethod: method,
+    variableConfig: method === 'kmap' && state.variableConfig.count > 6
+      ? {
+          ...state.variableConfig,
+          count: 6,
+          labels: generateVariableLabels(6, state.variableConfig.labels),
+        }
+      : state.variableConfig,
     result: null,
     currentStep: 0,
-  }),
+  })),
 
   setOutputFormat: (format) => set({
     outputFormat: format,

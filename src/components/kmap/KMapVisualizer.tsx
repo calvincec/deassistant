@@ -1,7 +1,11 @@
 import React from 'react';
 import { KMapStep, KMapGroup, CanonicalForm } from '@/types/logic';
 import { cn } from '@/lib/utils';
-import { getGrayCodeOrder } from '@/logic/normalize/inputNormalizer';
+import {
+  getGrayCodeOrder,
+  getKMapCellPosition,
+  getKMapDimensions,
+} from '@/logic/normalize/inputNormalizer';
 
 interface KMapVisualizerProps {
   step: KMapStep;
@@ -10,32 +14,24 @@ interface KMapVisualizerProps {
 
 export function KMapVisualizer({ step, canonical }: KMapVisualizerProps) {
   const { variableCount, variableLabels, minterms, dontCares } = canonical;
-  
-  const rows = variableCount <= 3 ? 2 : 4;
-  const cols = variableCount === 2 ? 2 : 4;
-  const grayCode = getGrayCodeOrder(variableCount);
+  const { rows, cols, rowBits, colBits } = getKMapDimensions(variableCount);
+  const rowGray = getGrayCodeOrder(rowBits);
+  const colGray = getGrayCodeOrder(colBits);
 
   const getRowLabels = (): string[] => {
-    if (variableCount === 2) return ['0', '1'];
-    if (variableCount === 3) return ['0', '1'];
-    return ['00', '01', '11', '10'];
+    return rowGray.map((value) => value.toString(2).padStart(rowBits, '0'));
   };
 
   const getColLabels = (): string[] => {
-    if (variableCount === 2) return ['0', '1'];
-    return ['00', '01', '11', '10'];
+    return colGray.map((value) => value.toString(2).padStart(colBits, '0'));
   };
 
   const getRowVarLabel = (): string => {
-    if (variableCount === 2) return variableLabels[0];
-    if (variableCount === 3) return variableLabels[0];
-    return variableLabels.slice(0, 2).join('');
+    return variableLabels.slice(0, rowBits).join('');
   };
 
   const getColVarLabel = (): string => {
-    if (variableCount === 2) return variableLabels[1];
-    if (variableCount === 3) return variableLabels.slice(1).join('');
-    return variableLabels.slice(2).join('');
+    return variableLabels.slice(rowBits).join('');
   };
 
   const getCellValue = (minterm: number): string => {
@@ -98,8 +94,10 @@ export function KMapVisualizer({ step, canonical }: KMapVisualizerProps) {
                     {rowLabels[rowIndex]}
                   </div>
                   {Array.from({ length: cols }).map((_, colIndex) => {
-                    const mintermIndex = rowIndex * cols + colIndex;
-                    const minterm = grayCode[mintermIndex];
+                    const minterm = parseInt(
+                      `${rowGray[rowIndex].toString(2).padStart(rowBits, '0')}${colGray[colIndex].toString(2).padStart(colBits, '0')}`,
+                      2,
+                    );
                     const value = getCellValue(minterm);
                     const groupColors = getCellGroupColors(minterm);
                     const highlighted = isHighlighted(minterm);
@@ -145,7 +143,7 @@ export function KMapVisualizer({ step, canonical }: KMapVisualizerProps) {
                 <GroupOutline
                   key={groupIdx}
                   group={group}
-                  grayCode={grayCode}
+                  variableCount={variableCount}
                   rows={rows}
                   cols={cols}
                 />
@@ -180,18 +178,18 @@ export function KMapVisualizer({ step, canonical }: KMapVisualizerProps) {
 
 interface GroupOutlineProps {
   group: KMapGroup;
-  grayCode: number[];
+  variableCount: number;
   rows: number;
   cols: number;
 }
 
-function GroupOutline({ group, grayCode, rows, cols }: GroupOutlineProps) {
+function GroupOutline({ group, variableCount, rows, cols }: GroupOutlineProps) {
   // Calculate bounding box for the group
   const positions = group.cells.map(cell => {
-    const idx = grayCode.indexOf(cell);
+    const position = getKMapCellPosition(cell, variableCount);
     return {
-      row: Math.floor(idx / cols),
-      col: idx % cols,
+      row: position.rowIndex,
+      col: position.colIndex,
     };
   });
 

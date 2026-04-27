@@ -16,6 +16,7 @@ import { solveKMap } from '@/logic/kmap/kmapSolver';
 import { solveQMC } from '@/logic/qmc/qmcSolver';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { generateVariableLabels } from '@/logic/normalize/inputNormalizer';
 
 const Index = () => {
   const { 
@@ -109,7 +110,7 @@ const Index = () => {
   const handleResetConfigAndSolver = () => {
     setVariableConfig({
       count: 4,
-      labels: ['A', 'B', 'C', 'D'],
+      labels: generateVariableLabels(4),
       defaultOutput: 0,
     });
     setSolverMethod('kmap');
@@ -197,8 +198,6 @@ const Index = () => {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Left Column: Configuration */}
             <div className="space-y-6">
-              <VariableConfigPanel />
-
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Solver Options</CardTitle>
@@ -207,6 +206,8 @@ const Index = () => {
                   <SolverSelector />
                 </CardContent>
               </Card>
+
+              <VariableConfigPanel />
 
             </div>
 
