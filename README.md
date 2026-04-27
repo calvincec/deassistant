@@ -26,3 +26,12 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+# Git commands
+```sh
+# log
+git log --oneline
+
+# Temporarily Move HEAD
+
+
+```

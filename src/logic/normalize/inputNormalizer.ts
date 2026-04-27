@@ -1,4 +1,5 @@
 import { CanonicalForm, CellValue, TruthTableRow } from '@/types/logic';
+import { evaluateBooleanExpressionAst, parseBooleanExpression } from '@/logic/expression/expressionEngine';
 
 /**
  * Normalizes all input formats into a canonical form
@@ -125,12 +126,14 @@ export function normalizeFromExpression(
   variableLabels: string[],
   isSOP: boolean
 ): CanonicalForm {
-  // Parse the boolean expression and evaluate for each minterm
+  void isSOP;
+
+  // Parse the boolean expression once and evaluate for each minterm assignment.
   const totalMinterms = Math.pow(2, variableCount);
   const minterms: number[] = [];
   const maxterms: number[] = [];
 
-  const cleanExpr = expression.trim();
+  const ast = parseBooleanExpression(expression, variableLabels);
   
   for (let i = 0; i < totalMinterms; i++) {
     const values: Record<string, boolean> = {};
@@ -138,7 +141,7 @@ export function normalizeFromExpression(
       values[label] = Boolean((i >> (variableCount - 1 - idx)) & 1);
     });
 
-    const result = evaluateExpression(cleanExpr, values, variableLabels);
+    const result = evaluateBooleanExpressionAst(ast, values);
     
     if (result) {
       minterms.push(i);
@@ -154,171 +157,6 @@ export function normalizeFromExpression(
     variableCount,
     variableLabels,
   };
-}
-
-function evaluateExpression(
-  expr: string,
-  values: Record<string, boolean>,
-  variableLabels: string[]
-): boolean {
-  type TokenType = 'var' | 'or' | 'and' | 'lparen' | 'rparen' | 'not';
-  interface Token {
-    type: TokenType;
-    value?: string;
-  }
-
-  const normalizedLabels = variableLabels
-    .map((label) => label.trim())
-    .filter(Boolean)
-    .sort((a, b) => b.length - a.length);
-
-  if (!normalizedLabels.length) return false;
-
-  const tokens: Token[] = [];
-  let i = 0;
-  const source = expr.replace(/\s+/g, '');
-
-  while (i < source.length) {
-    const ch = source[i];
-
-    if (ch === '+') {
-      tokens.push({ type: 'or' });
-      i += 1;
-      continue;
-    }
-
-    if (ch === '·' || ch === '*') {
-      tokens.push({ type: 'and' });
-      i += 1;
-      continue;
-    }
-
-    if (ch === '(') {
-      tokens.push({ type: 'lparen' });
-      i += 1;
-      continue;
-    }
-
-    if (ch === ')') {
-      tokens.push({ type: 'rparen' });
-      i += 1;
-      continue;
-    }
-
-    if (ch === "'") {
-      tokens.push({ type: 'not' });
-      i += 1;
-      continue;
-    }
-
-    if (/[A-Za-z0-9_]/.test(ch)) {
-      let matchedLabel: string | null = null;
-      for (const label of normalizedLabels) {
-        if (source.slice(i, i + label.length) === label) {
-          matchedLabel = label;
-          break;
-        }
-      }
-
-      if (!matchedLabel) {
-        return false;
-      }
-
-      tokens.push({ type: 'var', value: matchedLabel });
-      i += matchedLabel.length;
-      continue;
-    }
-
-    return false;
-  }
-
-  let index = 0;
-
-  const canEndTerm = (token: Token | null): boolean => {
-    if (!token) return false;
-    return token.type === 'var' || token.type === 'rparen' || token.type === 'not';
-  };
-
-  const canStartTerm = (token: Token | null): boolean => {
-    if (!token) return false;
-    return token.type === 'var' || token.type === 'lparen';
-  };
-
-  const parseExpression = (): boolean => {
-    let left = parseTerm();
-
-    while (index < tokens.length && tokens[index].type === 'or') {
-      index += 1;
-      const right = parseTerm();
-      left = left || right;
-    }
-
-    return left;
-  };
-
-  const parseTerm = (): boolean => {
-    let left = parseFactor();
-
-    while (index < tokens.length) {
-      const current = tokens[index];
-      const previous = index > 0 ? tokens[index - 1] : null;
-      const explicitAnd = current.type === 'and';
-      const implicitAnd = !explicitAnd && canEndTerm(previous) && canStartTerm(current);
-
-      if (!explicitAnd && !implicitAnd) break;
-
-      if (explicitAnd) {
-        index += 1;
-      }
-
-      const right = parseFactor();
-      left = left && right;
-    }
-
-    return left;
-  };
-
-  const parseFactor = (): boolean => {
-    let value: boolean;
-    const token = tokens[index];
-
-    if (!token) {
-      throw new Error('Unexpected end of expression');
-    }
-
-    if (token.type === 'var') {
-      value = Boolean(values[token.value ?? '']);
-      index += 1;
-    } else if (token.type === 'lparen') {
-      index += 1;
-      value = parseExpression();
-      if (!tokens[index] || tokens[index].type !== 'rparen') {
-        throw new Error('Missing closing parenthesis');
-      }
-      index += 1;
-    } else {
-      throw new Error('Invalid factor');
-    }
-
-    while (index < tokens.length && tokens[index].type === 'not') {
-      value = !value;
-      index += 1;
-    }
-
-    return value;
-  };
-
-  try {
-    const result = parseExpression();
-    if (index !== tokens.length) return false;
-    return result;
-  } catch {
-    return false;
-  }
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export function getGrayCodeOrder(variableCount: number): number[] {
