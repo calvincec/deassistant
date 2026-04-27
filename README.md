@@ -26,3 +26,11 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+# Revert to a Commit Safely (New Commit) 
+If you have already pushed your changes to github, it is safer to use git revert. This creates a new commit that undoes changes back to your target state without rewriting history. 
+
+```sh
+git log --oneline
+git revert --no-commit <commit_hash>..HEAD 
+git commit -m "..."
+```
