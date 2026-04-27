@@ -9,7 +9,7 @@ export type SolverMethod = 'kmap' | 'qmc';
 export type InputMethod = 'kmap' | 'truthTable' | 'expression' | 'minterms' | 'maxterms';
 
 export interface VariableConfig {
-  count: number; // minimum 1, K-map view is capped to 6
+  count: number; // 2-6
   labels: string[];
   defaultOutput: 0 | 1;
 }
@@ -89,7 +89,6 @@ export interface AppState {
   inputMethod: InputMethod;
   solverMethod: SolverMethod;
   outputFormat: OutputFormat;
-  expressionInput: string;
   canonicalForm: CanonicalForm | null;
   result: SolverResult | null;
   currentStep: number;

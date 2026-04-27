@@ -14,7 +14,6 @@ import { Separator } from '@/components/ui/separator';
 import { Play, RotateCcw, Cpu, BookOpen, ArrowLeft } from 'lucide-react';
 import { solveKMap } from '@/logic/kmap/kmapSolver';
 import { solveQMC } from '@/logic/qmc/qmcSolver';
-import { solveExpressionByLaws } from '@/logic/expression/expressionLawSolver';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { generateVariableLabels } from '@/logic/normalize/inputNormalizer';
@@ -25,13 +24,11 @@ const Index = () => {
     inputMethod, 
     solverMethod, 
     outputFormat,
-    expressionInput,
     canonicalForm,
     result,
     setVariableConfig,
     setSolverMethod,
     setOutputFormat,
-    setExpressionInput,
     setCanonicalForm,
     setResult,
     setCurrentStep,
@@ -79,42 +76,18 @@ const Index = () => {
         return;
       }
       
-      const shouldUseLawFallback =
-        inputMethod === 'expression' &&
-        solverMethod === 'qmc' &&
-        variableConfig.count > 12;
-
-      const solverResult = shouldUseLawFallback
-        ? solveExpressionByLaws(expressionInput, variableConfig.labels, outputFormat)
-        : solverMethod === 'kmap'
-          ? solveKMap(canonicalForm, outputFormat)
-          : solveQMC(canonicalForm, outputFormat);
+      const solverResult = solverMethod === 'kmap'
+        ? solveKMap(canonicalForm, outputFormat)
+        : solveQMC(canonicalForm, outputFormat);
       
       setResult(solverResult);
       setIsSolutionViewOpen(true);
       
       toast({
         title: 'Simplification Complete',
-        description: shouldUseLawFallback
-          ? 'Expression reduced using Boolean algebra laws'
-          : `Expression minimized using ${solverMethod === 'kmap' ? 'K-Map' : 'Quine-McCluskey'} method`,
+        description: `Expression minimized using ${solverMethod === 'kmap' ? 'K-Map' : 'Quine-McCluskey'} method`,
       });
     } catch (error) {
-      if (inputMethod === 'expression' && expressionInput.trim()) {
-        try {
-          const theoremResult = solveExpressionByLaws(expressionInput, variableConfig.labels, outputFormat);
-          setResult(theoremResult);
-          setIsSolutionViewOpen(true);
-          toast({
-            title: 'Fallback Applied',
-            description: 'QMC was not feasible; used theorem-based reduction steps instead.',
-          });
-          return;
-        } catch {
-          // Fall through to generic error below.
-        }
-      }
-
       toast({
         title: 'Error',
         description: 'Failed to simplify expression. Please check your input.',
@@ -127,7 +100,6 @@ const Index = () => {
 
   const handleResetFunctionInput = () => {
     setCanonicalForm(null);
-    setExpressionInput('');
     setResult(null);
     setCurrentStep(0);
     setInputResetKey((prev) => prev + 1);
@@ -145,7 +117,6 @@ const Index = () => {
     setOutputFormat('SOP');
 
     // Config and solver changes invalidate prior canonical/solution states.
-    setExpressionInput('');
     setCanonicalForm(null);
     setResult(null);
     setCurrentStep(0);

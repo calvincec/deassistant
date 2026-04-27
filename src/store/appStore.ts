@@ -16,7 +16,6 @@ interface AppStore extends AppState {
   setInputMethod: (method: InputMethod) => void;
   setSolverMethod: (method: SolverMethod) => void;
   setOutputFormat: (format: OutputFormat) => void;
-  setExpressionInput: (value: string) => void;
   setCanonicalForm: (form: CanonicalForm | null) => void;
   setResult: (result: SolverResult | null) => void;
   setCurrentStep: (step: number) => void;
@@ -37,7 +36,6 @@ const initialState: AppState = {
   inputMethod: 'kmap',
   solverMethod: 'kmap',
   outputFormat: 'SOP',
-  expressionInput: '',
   canonicalForm: null,
   result: null,
   currentStep: 0,
@@ -108,13 +106,6 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   setOutputFormat: (format) => set({
     outputFormat: format,
-    result: null,
-    currentStep: 0,
-  }),
-
-  setExpressionInput: (value) => set({
-    expressionInput: value,
-    canonicalForm: null,
     result: null,
     currentStep: 0,
   }),

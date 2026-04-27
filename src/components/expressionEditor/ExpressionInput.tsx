@@ -8,36 +8,32 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { normalizeFromExpression } from '@/logic/normalize/inputNormalizer';
-import { parseBooleanExpression } from '@/logic/expression/expressionEngine';
 
 const operatorButtons = [
   { symbol: '+', label: 'OR', className: 'bg-accent/20 hover:bg-accent/30 text-accent' },
   { symbol: '·', label: 'AND', className: 'bg-primary/20 hover:bg-primary/30 text-primary' },
   { symbol: "'", label: 'NOT', className: 'bg-destructive/20 hover:bg-destructive/30 text-destructive' },
-  { symbol: ' XOR ', label: 'XOR', className: 'bg-indigo-200/40 hover:bg-indigo-200/60 text-indigo-700' },
-  { symbol: ' NAND ', label: 'NAND', className: 'bg-amber-200/40 hover:bg-amber-200/60 text-amber-700' },
-  { symbol: ' NOR ', label: 'NOR', className: 'bg-emerald-200/40 hover:bg-emerald-200/60 text-emerald-700' },
   { symbol: '(', label: '(', className: 'bg-muted hover:bg-muted/80 text-muted-foreground' },
   { symbol: ')', label: ')', className: 'bg-muted hover:bg-muted/80 text-muted-foreground' },
 ];
 
 export function ExpressionInput() {
-  const { variableConfig, expressionInput, setExpressionInput, setCanonicalForm } = useAppStore();
+  const { variableConfig, setCanonicalForm } = useAppStore();
   const { count, labels } = variableConfig;
-
+  
+  const [expression, setExpression] = useState('');
   const [format, setFormat] = useState<'SOP' | 'POS'>('SOP');
   const [error, setError] = useState<string | null>(null);
 
   const handleInsert = (symbol: string) => {
-    setExpressionInput((() => {
-      const prev = expressionInput;
+    setExpression(prev => {
       const previousChar = prev.slice(-1);
-      const startsLikeVariable = /^[A-Za-z0-9_(]/.test(symbol.trimStart());
+      const startsLikeVariable = /^[A-Za-z0-9_]/.test(symbol);
       const needsImplicitAnd =
-        (startsLikeVariable || symbol.trimStart() === '(') && /[A-Za-z0-9_')]/.test(previousChar);
+        (startsLikeVariable || symbol === '(') && /[A-Za-z0-9_')]/.test(previousChar);
 
       return `${prev}${needsImplicitAnd ? '·' : ''}${symbol}`;
-    })());
+    });
   };
 
   const [a, b, c] = labels;
@@ -49,27 +45,159 @@ export function ExpressionInput() {
     : "(A + B)·(A' + C)·(B + C')";
 
   const validateExpression = (value: string): string | null => {
-    if (!value.trim()) return 'Expression is empty';
-
-    try {
-      parseBooleanExpression(value, labels);
-      return null;
-    } catch (parseError) {
-      if (parseError instanceof Error) {
-        return parseError.message;
-      }
-      return 'Invalid expression format';
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return 'Expression is empty';
     }
+
+    const normalizedLabels = labels
+      .map((label) => label.trim())
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length);
+
+    if (!normalizedLabels.length) {
+      return 'Define at least one variable label';
+    }
+
+    const allowedChars = /^[A-Za-z0-9_+·()'\s]*$/;
+    if (!allowedChars.test(value)) {
+      return 'Only variable names, +, ·, (, ), and apostrophe (\') are allowed';
+    }
+
+    type TokenType = 'label' | 'or' | 'and' | 'lparen' | 'rparen' | 'not';
+    type Token = { type: TokenType; raw: string };
+    const tokens: Token[] = [];
+
+    let i = 0;
+    while (i < value.length) {
+      const char = value[i];
+
+      if (/\s/.test(char)) {
+        i += 1;
+        continue;
+      }
+
+      if (char === '+') {
+        tokens.push({ type: 'or', raw: char });
+        i += 1;
+        continue;
+      }
+
+      if (char === '·') {
+        tokens.push({ type: 'and', raw: char });
+        i += 1;
+        continue;
+      }
+
+      if (char === '(') {
+        tokens.push({ type: 'lparen', raw: char });
+        i += 1;
+        continue;
+      }
+
+      if (char === ')') {
+        tokens.push({ type: 'rparen', raw: char });
+        i += 1;
+        continue;
+      }
+
+      if (char === "'") {
+        tokens.push({ type: 'not', raw: char });
+        i += 1;
+        continue;
+      }
+
+      if (/[A-Za-z0-9_]/.test(char)) {
+        let matchedLabel: string | null = null;
+        for (const label of normalizedLabels) {
+          if (value.slice(i, i + label.length) === label) {
+            matchedLabel = label;
+            break;
+          }
+        }
+
+        if (!matchedLabel) {
+          return `Unknown variable near "${value.slice(i, i + 8)}"`;
+        }
+
+        tokens.push({ type: 'label', raw: matchedLabel });
+        i += matchedLabel.length;
+        continue;
+      }
+
+      return `Invalid character "${char}"`;
+    }
+
+    if (!tokens.length) {
+      return 'Expression is empty';
+    }
+
+    let balance = 0;
+    const isOperandEnd = (type: TokenType) => type === 'label' || type === 'rparen' || type === 'not';
+    const isOperandStart = (type: TokenType) => type === 'label' || type === 'lparen';
+
+    for (let index = 0; index < tokens.length; index += 1) {
+      const current = tokens[index];
+      const prev = index > 0 ? tokens[index - 1] : null;
+      const next = index < tokens.length - 1 ? tokens[index + 1] : null;
+
+      if (current.type === 'lparen') {
+        balance += 1;
+        if (prev && isOperandEnd(prev.type)) {
+          // Implicit AND is allowed (e.g., A(B+C)).
+        }
+      }
+
+      if (current.type === 'rparen') {
+        balance -= 1;
+        if (balance < 0) {
+          return 'Unbalanced parentheses';
+        }
+        if (prev && (prev.type === 'or' || prev.type === 'and' || prev.type === 'lparen')) {
+          return 'Empty or invalid term inside parentheses';
+        }
+      }
+
+      if (current.type === 'or' || current.type === 'and') {
+        if (!prev || !next) {
+          return 'Expression cannot start or end with an operator';
+        }
+        if (!isOperandEnd(prev.type) || !isOperandStart(next.type)) {
+          return 'Invalid operator placement';
+        }
+      }
+
+      if (current.type === 'not') {
+        if (!prev || prev.type !== 'label') {
+          return "Apostrophe (') must come immediately after a variable";
+        }
+      }
+
+      if (current.type === 'label' && prev && prev.type === 'rparen') {
+        // Implicit AND is allowed (e.g., (A+B)C).
+      }
+    }
+
+    if (balance !== 0) {
+      return 'Unbalanced parentheses';
+    }
+
+    const lastToken = tokens[tokens.length - 1];
+    if (lastToken.type === 'or' || lastToken.type === 'and' || lastToken.type === 'lparen') {
+      return 'Expression cannot end with an operator or open parenthesis';
+    }
+
+    return null;
   };
 
-  const validationError = useMemo(() => validateExpression(expressionInput), [expressionInput, labels]);
+  const validationError = useMemo(() => validateExpression(expression), [expression, labels]);
 
   useEffect(() => {
     setError(validationError);
   }, [validationError]);
 
   useEffect(() => {
-    if (!expressionInput.trim()) {
+    if (!expression.trim()) {
       setCanonicalForm(null);
       return;
     }
@@ -80,9 +208,9 @@ export function ExpressionInput() {
     }
 
     setCanonicalForm(
-      normalizeFromExpression(expressionInput, count, labels, format === 'SOP'),
+      normalizeFromExpression(expression, count, labels, format === 'SOP'),
     );
-  }, [expressionInput, format, count, labels, setCanonicalForm, validationError]);
+  }, [expression, format, count, labels, setCanonicalForm, validationError]);
 
   return (
     <div className="space-y-6">
@@ -144,15 +272,15 @@ export function ExpressionInput() {
         </div>
         <Textarea
           id="expression"
-          value={expressionInput}
-          onChange={(e) => setExpressionInput(e.target.value)}
+          value={expression}
+          onChange={(e) => setExpression(e.target.value)}
           placeholder={format === 'SOP' 
             ? `e.g., ${sopExample}`
             : `e.g., ${posExample}`}
           className="font-mono min-h-[80px]"
         />
         <p className="text-xs text-muted-foreground">
-          Supports ', +, ·, XOR, NAND, NOR, adjacency (implicit AND), and optional F = ... prefix
+          Use ' for NOT (complement), + for OR, · or adjacent terms for AND
         </p>
       </div>
 
@@ -163,10 +291,10 @@ export function ExpressionInput() {
         </div>
       )}
 
-      {expressionInput && !error && (
+      {expression && !error && (
         <div className="bg-card border border-border rounded-lg p-4">
           <span className="text-sm text-muted-foreground">Preview: </span>
-          <span className="font-mono text-foreground">F = {expressionInput}</span>
+          <span className="font-mono text-foreground">F = {expression}</span>
         </div>
       )}
     </div>
