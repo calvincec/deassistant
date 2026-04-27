@@ -132,6 +132,28 @@ function findPrimeImplicants(
   variableCount: number
 ): { primeImplicants: Implicant[]; combinationSteps: CombinationStep[] } {
   const combinationSteps: CombinationStep[] = [];
+  const primeImplicants: Implicant[] = [];
+  const seen = new Set<string>();
+
+  const collectUnused = (groups: Map<number, TermEntry[]>) => {
+    groups.forEach(entries => {
+      entries.forEach(entry => {
+        if (!entry.used) {
+          const key = `${entry.binary}-${entry.minterms.join(',')}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            primeImplicants.push({
+              binary: entry.binary,
+              minterms: entry.minterms,
+              isPrime: true,
+              isEssential: false,
+            });
+          }
+        }
+      });
+    });
+  };
+
   let currentGroups = initialGroups;
   let iteration = 1;
   let hasChanges = true;
@@ -194,32 +216,16 @@ function findPrimeImplicants(
       combinationSteps.push({ iteration, pairs: stepPairs });
     }
 
+    // Any term that was not combined in this round is a prime implicant.
+    collectUnused(currentGroups);
+
     currentGroups = newGroups;
     iteration++;
   }
 
   // Collect prime implicants (unused terms from all iterations)
-  const primeImplicants: Implicant[] = [];
-  const seen = new Set<string>();
-
-  const collectUnused = (groups: Map<number, TermEntry[]>) => {
-    groups.forEach(entries => {
-      entries.forEach(entry => {
-        if (!entry.used) {
-          const key = `${entry.binary}-${entry.minterms.join(',')}`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            primeImplicants.push({
-              binary: entry.binary,
-              minterms: entry.minterms,
-              isPrime: true,
-              isEssential: false,
-            });
-          }
-        }
-      });
-    });
-  };
+  // Collect prime implicants from the final round as well.
+  collectUnused(currentGroups);
 
   collectUnused(initialGroups);
   
