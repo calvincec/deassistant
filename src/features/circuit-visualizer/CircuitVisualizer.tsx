@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { expressionToNetlist } from './parser';
+import { useAppStore } from '@/store/appStore';
 import { useDigitalJS } from './useDigitalJS';
 import './styles.css';
 
@@ -11,11 +12,12 @@ interface CircuitVisualizerProps {
 
 export function CircuitVisualizer({ expression }: CircuitVisualizerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { variableConfig } = useAppStore();
 
   const { netlist, parseError } = useMemo(() => {
     try {
       return {
-        netlist: expressionToNetlist(expression),
+        netlist: expressionToNetlist(expression, variableConfig.labels),
         parseError: null as string | null,
       };
     } catch (cause) {

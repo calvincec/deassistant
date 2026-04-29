@@ -22,7 +22,7 @@ interface BuildState {
   counters: Record<string, number>;
 }
 
-export function expressionToNetlist(expression: string): DigitalJSNetlist {
+export function expressionToNetlist(expression: string, variableLabels?: string[]): DigitalJSNetlist {
   const { outputName, expression: parsedExpression } = parseExpression(expression);
   const state: BuildState = {
     devices: {},
@@ -37,6 +37,23 @@ export function expressionToNetlist(expression: string): DigitalJSNetlist {
       input: 0,
     },
   };
+
+  // Pre-create input devices for any configured variable labels so the
+  // visualizer shows each variable independently even if a simplified
+  // expression omits some explicit occurrences.
+  if (Array.isArray(variableLabels)) {
+    for (const label of variableLabels) {
+      if (state.variableIds.has(label)) continue;
+      const inputId = nextId(state, 'input');
+      state.variableIds.set(label, inputId);
+      state.devices[inputId] = {
+        type: 'Input',
+        bits: 1,
+        label,
+        net: label,
+      };
+    }
+  }
 
   const outputSource = buildNode(parsedExpression, state);
   const outputId = nextId(state, 'output');
@@ -100,8 +117,18 @@ function tokenize(source: string): Token[] {
       while (end < source.length && /[A-Za-z0-9_]/.test(source[end])) {
         end += 1;
       }
+      const raw = source.slice(index, end);
 
-      tokens.push({ kind: 'identifier', value: source.slice(index, end) });
+      // If the identifier is a run of letters only (e.g. "AB"), treat as implied
+      // concatenation of single-letter variables (A AND B). This keeps inputs
+      // separate when users write adjacency like "CD" meaning C AND D.
+      if (/^[A-Za-z]{2,}$/.test(raw)) {
+        for (const ch of raw) {
+          tokens.push({ kind: 'identifier', value: ch });
+        }
+      } else {
+        tokens.push({ kind: 'identifier', value: raw });
+      }
       index = end;
       continue;
     }
