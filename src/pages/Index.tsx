@@ -25,13 +25,11 @@ const Index = () => {
     solverMethod, 
     outputFormat,
     canonicalForm,
-    expressionReduction,
     result,
     setVariableConfig,
     setSolverMethod,
     setOutputFormat,
     setCanonicalForm,
-    setExpressionReduction,
     setResult,
     setCurrentStep,
   } = useAppStore();
@@ -69,15 +67,6 @@ const Index = () => {
     setIsProcessing(true);
     
     try {
-      if (expressionReduction) {
-        setIsSolutionViewOpen(true);
-        toast({
-          title: 'Reduction Complete',
-          description: 'Expression simplified using boolean theorems and laws',
-        });
-        return;
-      }
-
       if (!canonicalForm) {
         toast({
           title: 'Missing Input',
@@ -111,7 +100,6 @@ const Index = () => {
 
   const handleResetFunctionInput = () => {
     setCanonicalForm(null);
-    setExpressionReduction(null);
     setResult(null);
     setCurrentStep(0);
     setInputResetKey((prev) => prev + 1);
@@ -130,7 +118,6 @@ const Index = () => {
 
     // Config and solver changes invalidate prior canonical/solution states.
     setCanonicalForm(null);
-    setExpressionReduction(null);
     setResult(null);
     setCurrentStep(0);
     setIsSolutionViewOpen(false);
