@@ -69,21 +69,6 @@ export interface SolverResult {
   steps: KMapStep[] | QMCStep[];
 }
 
-export interface CircuitGate {
-  id: string;
-  type: 'AND' | 'OR' | 'NOT' | 'NAND' | 'NOR' | 'XOR' | 'INPUT' | 'OUTPUT';
-  inputs: string[];
-  output: string;
-  label?: string;
-}
-
-export interface CircuitModel {
-  gates: CircuitGate[];
-  inputs: string[];
-  outputs: string[];
-  connections: { from: string; to: string }[];
-}
-
 export interface AppState {
   variableConfig: VariableConfig;
   inputMethod: InputMethod;
