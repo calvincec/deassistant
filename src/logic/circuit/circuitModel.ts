@@ -27,9 +27,9 @@ export function generateCircuitModel(
   });
 
   if (outputFormat === 'SOP') {
-    return generateSOPCircuit(gates, connections, implicants, variableLabels);
+    return generateSOPCircuit(gates, connections, implicants, variableLabels, expression);
   } else {
-    return generatePOSCircuit(gates, connections, implicants, variableLabels);
+    return generatePOSCircuit(gates, connections, implicants, variableLabels, expression);
   }
 }
 
@@ -37,7 +37,8 @@ function generateSOPCircuit(
   gates: CircuitGate[],
   connections: { from: string; to: string }[],
   implicants: Implicant[],
-  variableLabels: string[]
+  variableLabels: string[],
+  expression: string
 ): CircuitModel {
   const andOutputs: string[] = [];
   let gateCounter = 0;
@@ -104,7 +105,7 @@ function generateSOPCircuit(
       type: 'OUTPUT',
       inputs: ['gnd'],
       output: 'F',
-      label: 'F = 0',
+      label: `F = ${expression}`,
     });
   } else if (andOutputs.length === 1) {
     gates.push({
@@ -112,7 +113,7 @@ function generateSOPCircuit(
       type: 'OUTPUT',
       inputs: andOutputs,
       output: 'F',
-      label: 'F',
+      label: `F = ${expression}`,
     });
     connections.push({ from: andOutputs[0], to: 'output_f' });
   } else {
@@ -130,7 +131,7 @@ function generateSOPCircuit(
       type: 'OUTPUT',
       inputs: ['wire_or'],
       output: 'F',
-      label: 'F',
+      label: `F = ${expression}`,
     });
     connections.push({ from: 'wire_or', to: 'output_f' });
   }
@@ -147,7 +148,8 @@ function generatePOSCircuit(
   gates: CircuitGate[],
   connections: { from: string; to: string }[],
   implicants: Implicant[],
-  variableLabels: string[]
+  variableLabels: string[],
+  expression: string
 ): CircuitModel {
   const orOutputs: string[] = [];
   let gateCounter = 0;
@@ -198,6 +200,7 @@ function generatePOSCircuit(
         type: 'OR',
         inputs,
         output: orOutput,
+        label: describeSumTerm(imp.binary, variableLabels),
       });
       inputs.forEach(inp => connections.push({ from: inp, to: orId }));
       orOutputs.push(orOutput);
@@ -211,7 +214,7 @@ function generatePOSCircuit(
       type: 'OUTPUT',
       inputs: ['vcc'],
       output: 'F',
-      label: 'F = 1',
+      label: `F = ${expression}`,
     });
   } else if (orOutputs.length === 1) {
     gates.push({
@@ -219,7 +222,7 @@ function generatePOSCircuit(
       type: 'OUTPUT',
       inputs: orOutputs,
       output: 'F',
-      label: 'F',
+      label: `F = ${expression}`,
     });
     connections.push({ from: orOutputs[0], to: 'output_f' });
   } else {
@@ -237,7 +240,7 @@ function generatePOSCircuit(
       type: 'OUTPUT',
       inputs: ['wire_and'],
       output: 'F',
-      label: 'F',
+      label: `F = ${expression}`,
     });
     connections.push({ from: 'wire_and', to: 'output_f' });
   }
@@ -260,6 +263,20 @@ function describeTerm(binary: string, labels: string[]): string {
     }
   }
   return term || '1';
+}
+
+function describeSumTerm(binary: string, labels: string[]): string {
+  const literals: string[] = [];
+
+  for (let i = 0; i < binary.length; i++) {
+    if (binary[i] === '0') {
+      literals.push(labels[i]);
+    } else if (binary[i] === '1') {
+      literals.push(`${labels[i]}'`);
+    }
+  }
+
+  return literals.length > 0 ? `(${literals.join(' + ')})` : '0';
 }
 
 // Export circuit as JSON for future rendering tools
