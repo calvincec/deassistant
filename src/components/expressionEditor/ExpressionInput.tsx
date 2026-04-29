@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { normalizeFromExpression } from '@/logic/normalize/inputNormalizer';
+import { analyzeExpressionInput } from '@/logic/expression/theoremReducer';
 
 const operatorButtons = [
   { symbol: '+', label: 'OR', className: 'bg-accent/20 hover:bg-accent/30 text-accent' },
@@ -18,7 +18,7 @@ const operatorButtons = [
 ];
 
 export function ExpressionInput() {
-  const { variableConfig, setCanonicalForm } = useAppStore();
+  const { variableConfig, setCanonicalForm, setExpressionReduction } = useAppStore();
   const { count, labels } = variableConfig;
   
   const [expression, setExpression] = useState('');
@@ -168,8 +168,8 @@ export function ExpressionInput() {
       }
 
       if (current.type === 'not') {
-        if (!prev || prev.type !== 'label') {
-          return "Apostrophe (') must come immediately after a variable";
+        if (!prev || (prev.type !== 'label' && prev.type !== 'rparen' && prev.type !== 'not')) {
+          return "Apostrophe (') must follow a variable, group, or another complement";
         }
       }
 
@@ -190,6 +190,11 @@ export function ExpressionInput() {
     return null;
   };
 
+  const analysis = useMemo(
+    () => analyzeExpressionInput(expression, count, labels, format === 'SOP'),
+    [expression, count, labels, format]
+  );
+
   const validationError = useMemo(() => validateExpression(expression), [expression, labels]);
 
   useEffect(() => {
@@ -199,18 +204,25 @@ export function ExpressionInput() {
   useEffect(() => {
     if (!expression.trim()) {
       setCanonicalForm(null);
+      setExpressionReduction(null);
       return;
     }
 
     if (validationError) {
       setCanonicalForm(null);
+      setExpressionReduction(null);
       return;
     }
 
-    setCanonicalForm(
-      normalizeFromExpression(expression, count, labels, format === 'SOP'),
-    );
-  }, [expression, format, count, labels, setCanonicalForm, validationError]);
+    if (analysis.strategy === 'theorem' && analysis.reduction) {
+      setCanonicalForm(null);
+      setExpressionReduction(analysis.reduction);
+      return;
+    }
+
+    setExpressionReduction(null);
+    setCanonicalForm(analysis.canonicalForm);
+  }, [expression, analysis, setCanonicalForm, setExpressionReduction, validationError]);
 
   return (
     <div className="space-y-6">

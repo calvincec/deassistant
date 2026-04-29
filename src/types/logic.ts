@@ -69,6 +69,17 @@ export interface SolverResult {
   steps: KMapStep[] | QMCStep[];
 }
 
+export interface ExpressionReductionStep {
+  title: string;
+  description: string;
+  expression: string;
+}
+
+export interface ExpressionReductionResult {
+  expression: string;
+  steps: ExpressionReductionStep[];
+}
+
 export interface CircuitGate {
   id: string;
   type: 'AND' | 'OR' | 'NOT' | 'NAND' | 'NOR' | 'XOR' | 'INPUT' | 'OUTPUT';
@@ -90,6 +101,7 @@ export interface AppState {
   solverMethod: SolverMethod;
   outputFormat: OutputFormat;
   canonicalForm: CanonicalForm | null;
+  expressionReduction: ExpressionReductionResult | null;
   result: SolverResult | null;
   currentStep: number;
   isProcessing: boolean;

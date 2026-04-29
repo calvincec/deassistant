@@ -10,6 +10,7 @@ import { ResultsPanel } from '@/components/results/ResultsPanel';
 import { CircuitDiagramPanel } from '@/components/circuit/CircuitDiagramPanel';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { KMapStep, QMCStep } from '@/types/logic';
+import { TheoremReductionViewer } from '@/components/results/TheoremReductionViewer';
 
 export function StepByStepViewer() {
   const { 
@@ -20,8 +21,13 @@ export function StepByStepViewer() {
     prevStep,
     solverMethod,
     outputFormat,
-    canonicalForm
+    canonicalForm,
+    expressionReduction,
   } = useAppStore();
+
+  if (expressionReduction) {
+    return <TheoremReductionViewer reduction={expressionReduction} />;
+  }
 
   if (!result || !canonicalForm) {
     return (

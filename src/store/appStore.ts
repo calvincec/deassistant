@@ -6,7 +6,8 @@ import {
   SolverMethod, 
   OutputFormat,
   CanonicalForm,
-  SolverResult 
+  SolverResult,
+  ExpressionReductionResult
 } from '@/types/logic';
 import { generateVariableLabels } from '@/logic/normalize/inputNormalizer';
 
@@ -17,6 +18,7 @@ interface AppStore extends AppState {
   setSolverMethod: (method: SolverMethod) => void;
   setOutputFormat: (format: OutputFormat) => void;
   setCanonicalForm: (form: CanonicalForm | null) => void;
+  setExpressionReduction: (reduction: ExpressionReductionResult | null) => void;
   setResult: (result: SolverResult | null) => void;
   setCurrentStep: (step: number) => void;
   setIsProcessing: (processing: boolean) => void;
@@ -37,6 +39,7 @@ const initialState: AppState = {
   solverMethod: 'kmap',
   outputFormat: 'SOP',
   canonicalForm: null,
+  expressionReduction: null,
   result: null,
   currentStep: 0,
   isProcessing: false,
@@ -63,6 +66,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         labels,
       },
       canonicalForm: null,
+      expressionReduction: null,
       result: null,
       currentStep: 0,
     };
@@ -83,6 +87,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           }
         : state.variableConfig,
       canonicalForm: null,
+      expressionReduction: null,
       result: null,
       currentStep: 0,
     };
@@ -101,23 +106,34 @@ export const useAppStore = create<AppStore>((set, get) => ({
         }
       : state.variableConfig,
     result: null,
+    expressionReduction: null,
     currentStep: 0,
   })),
 
   setOutputFormat: (format) => set({
     outputFormat: format,
     result: null,
+    expressionReduction: null,
     currentStep: 0,
   }),
 
   setCanonicalForm: (form) => set({
     canonicalForm: form,
+    expressionReduction: null,
+    result: null,
+    currentStep: 0,
+  }),
+
+  setExpressionReduction: (reduction) => set({
+    expressionReduction: reduction,
+    canonicalForm: null,
     result: null,
     currentStep: 0,
   }),
 
   setResult: (result) => set({
     result,
+    expressionReduction: null,
     currentStep: 0,
   }),
 
