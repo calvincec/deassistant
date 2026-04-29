@@ -31,6 +31,6 @@ If you have already pushed your changes to github, it is safer to use git revert
 
 ```sh
 git log --oneline
-git revert --no-commit <commit_hash>..HEAD 
+git revert --no-commit 7be586a..HEAD 
 git commit -m "..."
 ```
