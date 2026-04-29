@@ -37,7 +37,7 @@ export function ResultsPanel({
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Final Expression */}
-      <Card className="border-2 border-accent bg-gradient-to-br from-accent/5 to-background">
+      <Card className="border border-border bg-card">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center justify-between">
             <span>Minimized Expression ({outputFormat})</span>

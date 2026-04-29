@@ -11,7 +11,7 @@ import { StepByStepViewer } from '@/components/results/StepByStepViewer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Play, RotateCcw, Cpu, BookOpen, ArrowLeft } from 'lucide-react';
+import { Play, RotateCcw, Cpu, ArrowLeft } from 'lucide-react';
 import { solveKMap } from '@/logic/kmap/kmapSolver';
 import { solveQMC } from '@/logic/qmc/qmcSolver';
 import { useToast } from '@/hooks/use-toast';
@@ -154,7 +154,7 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-primary flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl border border-border bg-foreground flex items-center justify-center">
                 <Cpu className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
@@ -163,10 +163,6 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <BookOpen className="w-4 h-4" />
-                <span className="hidden md:inline">Tutorial</span>
-              </Button>
               <ThemeToggle />
             </div>
           </div>
