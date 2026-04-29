@@ -153,7 +153,11 @@ export function StepByStepViewer() {
             outputFormat={outputFormat}
           />
 
-          <CircuitVisualizer expression={`F = ${result.expression}`} />
+          <CircuitVisualizer
+            canonical={canonicalForm}
+            minimizedExpression={result.expression}
+            outputFormat={outputFormat}
+          />
         </>
       )}
     </div>
