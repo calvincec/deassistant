@@ -16,6 +16,20 @@ type LayoutNode = {
   y: number;
   width: number;
   height: number;
+  inputCount: number;
+  outputCount: number;
+};
+
+type LayoutPort = {
+  x: number;
+  y: number;
+};
+
+type LayoutConnection = {
+  from: string;
+  to: string;
+  fromPort: LayoutPort;
+  toPort: LayoutPort;
 };
 
 type DiagramContentProps = {
@@ -32,6 +46,7 @@ const STAGE_GAP = 210;
 const ROW_GAP = 76;
 const TOP_PADDING = 44;
 const LEFT_PADDING = 28;
+const CONNECTOR_OFFSET = 18;
 
 export const CircuitDiagramPanel = () => {
   const [isMaximized, setIsMaximized] = useState(false);
@@ -151,7 +166,7 @@ function DiagramContent({ compact = false }: DiagramContentProps) {
           </defs>
 
           {layout.connections.map((connection) => {
-            const path = buildConnectionPath(layout.nodesByKey, connection.from, connection.to);
+            const path = buildConnectionPath(connection.fromPort, connection.toPort);
 
             return path ? (
               <path
@@ -208,6 +223,8 @@ function buildLayout(model: CircuitModel) {
 
   const nodes: LayoutNode[] = [];
   const nodesByKey = new Map<string, LayoutNode>();
+  const outputPortByWire = new Map<string, LayoutPort>();
+  const inputPortsByGate = new Map<string, LayoutPort[]>();
 
   const pushNode = (node: LayoutNode) => {
     nodes.push(node);
@@ -215,39 +232,94 @@ function buildLayout(model: CircuitModel) {
   };
 
   inputGates.forEach((gate, index) => {
-    pushNode(makeNode(gate.id, gate.label ?? gate.output, gate.type, 0, TOP_PADDING + index * ROW_GAP));
+    const node = makeNode(gate.id, gate.label ?? gate.output, gate.type, 0, TOP_PADDING + index * ROW_GAP, 0, 1);
+    pushNode(node);
+    outputPortByWire.set(gate.output, getOutputPort(node));
   });
 
   notGates.forEach((gate, index) => {
     const labelBase = gate.label?.replace(/'/g, '');
     const matchedInput = inputGates.findIndex((input) => input.label === labelBase || input.output === `wire_${labelBase}`);
     const y = matchedInput >= 0 ? TOP_PADDING + matchedInput * ROW_GAP : TOP_PADDING + index * ROW_GAP;
-    pushNode(makeNode(gate.id, gate.label ?? gate.output, gate.type, 1, y));
+    const node = makeNode(gate.id, gate.label ?? gate.output, gate.type, 1, y, 1, 1);
+    pushNode(node);
+    inputPortsByGate.set(gate.id, [getInputPort(node, 0)]);
+    outputPortByWire.set(gate.output, getOutputPort(node));
   });
 
   termGates.forEach((gate, index) => {
-    pushNode(makeNode(gate.id, gate.label ?? gate.output, gate.type, 2, TOP_PADDING + index * ROW_GAP));
+    const inputCount = Math.max(gate.inputs.length, 2);
+    const node = makeNode(gate.id, gate.label ?? gate.output, gate.type, 2, TOP_PADDING + index * ROW_GAP, inputCount, 1);
+    pushNode(node);
+    inputPortsByGate.set(gate.id, Array.from({ length: inputCount }, (_, inputIndex) => getInputPort(node, inputIndex)));
+    outputPortByWire.set(gate.output, getOutputPort(node));
   });
 
   const terminalY = TOP_PADDING + ((Math.max(termGates.length, 1) - 1) * ROW_GAP) / 2;
   if (finalGate) {
-    pushNode(makeNode(finalGate.id, finalGate.label ?? finalGate.output, finalGate.type, 3, terminalY));
+    const inputCount = Math.max(finalGate.inputs.length, 1);
+    const node = makeNode(finalGate.id, finalGate.label ?? finalGate.output, finalGate.type, 3, terminalY, inputCount, 1);
+    pushNode(node);
+    inputPortsByGate.set(finalGate.id, Array.from({ length: inputCount }, (_, inputIndex) => getInputPort(node, inputIndex)));
+    outputPortByWire.set(finalGate.output, getOutputPort(node));
   }
 
   if (outputGate) {
-    pushNode(makeNode(outputGate.id, outputGate.label ?? outputGate.output, outputGate.type, 4, terminalY));
+    const node = makeNode(outputGate.id, outputGate.label ?? outputGate.output, outputGate.type, 4, terminalY, Math.max(outputGate.inputs.length, 1), 1);
+    pushNode(node);
+    inputPortsByGate.set(outputGate.id, [getInputPort(node, 0)]);
   }
+
+  model.gates.forEach((gate) => {
+    if (gate.type === 'INPUT') return;
+    if (gate.output) {
+      const node = nodesByKey.get(gate.id);
+      if (node) {
+        outputPortByWire.set(gate.output, getOutputPort(node));
+      }
+    }
+  });
+
+  const connections: LayoutConnection[] = [];
+  const inputUseCount = new Map<string, number>();
+
+  model.connections.forEach((connection) => {
+    const fromPort = resolveSourcePort(connection.from, nodesByKey, outputPortByWire);
+    const targetNode = resolveTargetNode(connection.to, nodesByKey);
+    const targetPorts = targetNode ? inputPortsByGate.get(targetNode.id) ?? [] : [];
+    const inputIndex = inputUseCount.get(connection.to) ?? 0;
+    const toPort = targetPorts[Math.min(inputIndex, Math.max(targetPorts.length - 1, 0))] ?? resolveFallbackTargetPort(targetNode);
+
+    inputUseCount.set(connection.to, inputIndex + 1);
+
+    if (fromPort && toPort) {
+      connections.push({
+        from: connection.from,
+        to: connection.to,
+        fromPort,
+        toPort,
+      });
+    }
+  });
 
   return {
     nodes,
     nodesByKey,
-    connections: model.connections,
+    connections,
     width,
     height,
   };
 }
 
-function makeNode(id: string, label: string, type: CircuitGate['type'], stageIndex: number, y: number): LayoutNode {
+function makeNode(
+  id: string,
+  label: string,
+  type: CircuitGate['type'],
+  stageIndex: number,
+  y: number,
+  inputCount: number,
+  outputCount: number
+): LayoutNode {
   const dimensions = getNodeDimensions(type);
 
   return {
@@ -258,22 +330,24 @@ function makeNode(id: string, label: string, type: CircuitGate['type'], stageInd
     y,
     width: dimensions.width,
     height: dimensions.height,
+    inputCount,
+    outputCount,
   };
 }
 
-function buildConnectionPath(nodesByKey: Map<string, LayoutNode>, from: string, to: string): string {
-  const source = nodesByKey.get(from);
-  const target = nodesByKey.get(to);
+function buildConnectionPath(fromPort: LayoutPort, toPort: LayoutPort): string {
+  const startX = fromPort.x;
+  const startY = fromPort.y;
+  const endX = toPort.x;
+  const endY = toPort.y;
 
-  if (!source || !target) return '';
+  const bendX = Math.max(startX + CONNECTOR_OFFSET, endX - CONNECTOR_OFFSET);
 
-  const startX = source.x + source.width;
-  const startY = source.y + source.height / 2;
-  const endX = target.x;
-  const endY = target.y + target.height / 2;
-  const middleX = startX + (endX - startX) / 2;
+  if (Math.abs(startY - endY) < 2) {
+    return `M ${startX} ${startY} H ${endX}`;
+  }
 
-  return `M ${startX} ${startY} H ${middleX} V ${endY} H ${endX}`;
+  return `M ${startX} ${startY} H ${bendX} V ${endY} H ${endX}`;
 }
 
 function gateTone(type: CircuitGate['type']): string {
@@ -304,8 +378,79 @@ function getNodeDimensions(type: CircuitGate['type']) {
   }
 }
 
+function getInputPort(node: LayoutNode, index: number): LayoutPort {
+  if (node.type === 'INPUT') {
+    return { x: node.x, y: node.y + node.height / 2 };
+  }
+
+  if (node.type === 'OUTPUT') {
+    return { x: node.x + 6, y: node.y + node.height / 2 };
+  }
+
+  if (node.type === 'NOT') {
+    return { x: node.x, y: node.y + node.height / 2 };
+  }
+
+  const totalInputs = Math.max(node.inputCount, 2);
+  const step = node.height / (totalInputs + 1);
+  return {
+    x: node.x,
+    y: node.y + step * (index + 1),
+  };
+}
+
+function getOutputPort(node: LayoutNode): LayoutPort {
+  if (node.type === 'INPUT') {
+    return {
+      x: node.x + node.width - 8,
+      y: node.y + node.height / 2,
+    };
+  }
+
+  if (node.type === 'NOT' || node.type === 'AND' || node.type === 'OR') {
+    return {
+      x: node.x + node.width + 28,
+      y: node.y + node.height / 2,
+    };
+  }
+
+  return {
+    x: node.x + node.width,
+    y: node.y + node.height / 2,
+  };
+}
+
+function resolveSourcePort(
+  from: string,
+  nodesByKey: Map<string, LayoutNode>,
+  outputPortByWire: Map<string, LayoutPort>
+): LayoutPort | null {
+  const portByWire = outputPortByWire.get(from);
+  if (portByWire) return portByWire;
+
+  const node = nodesByKey.get(from);
+  if (node) return getOutputPort(node);
+
+  if (from === 'vcc' || from === 'gnd') {
+    return null;
+  }
+
+  return null;
+}
+
+function resolveTargetNode(to: string, nodesByKey: Map<string, LayoutNode>): LayoutNode | null {
+  return nodesByKey.get(to) ?? null;
+}
+
+function resolveFallbackTargetPort(node: LayoutNode | null): LayoutPort | null {
+  if (!node) return null;
+  return {
+    x: node.x,
+    y: node.y + node.height / 2,
+  };
+}
+
 function renderGateSymbol(node: LayoutNode) {
-  const isSmall = node.type === 'INPUT' || node.type === 'OUTPUT';
   const strokeClass = strokeTone(node.type);
   const label = node.type === 'OUTPUT' ? 'F' : node.label;
 
@@ -321,8 +466,8 @@ function renderGateSymbol(node: LayoutNode) {
       {node.type !== 'INPUT' && node.type !== 'OUTPUT' && (
         <>
           {renderGateBody(node.type, node.width, node.height, strokeClass)}
-          {renderGateInputs(node.type, node.width, node.height, strokeClass)}
-          {renderGateOutput(node.type, node.width, node.height, strokeClass)}
+          {renderGateInputs(node, strokeClass)}
+          {renderGateOutput(node, strokeClass)}
         </>
       )}
 
@@ -338,8 +483,8 @@ function renderGateSymbol(node: LayoutNode) {
 
       {node.type === 'OUTPUT' && (
         <>
-          <path d={`M 10 ${node.height / 2} H ${node.width - 14}`} className={strokeClass} stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-          <circle cx={node.width - 10} cy={node.height / 2} r="4" className={strokeClass} fill="currentColor" />
+          <path d={`M 6 ${node.height / 2} H ${node.width - 14}`} className={strokeClass} stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+          <circle cx={6} cy={node.height / 2} r="4" className={strokeClass} fill="currentColor" />
           <text x={node.width / 2} y={node.height / 2 + 4} textAnchor="middle" className="fill-foreground text-[10px] font-semibold">
             {label}
           </text>
@@ -357,7 +502,6 @@ function renderGateBody(type: CircuitGate['type'], width: number, height: number
     const right = width - 16;
     const top = 12;
     const bottom = height - 12;
-    const centerY = height / 2;
 
     return (
       <path
@@ -397,7 +541,9 @@ function renderGateBody(type: CircuitGate['type'], width: number, height: number
   return null;
 }
 
-function renderGateInputs(type: CircuitGate['type'], width: number, height: number, strokeClass: string) {
+function renderGateInputs(node: LayoutNode, strokeClass: string) {
+  const { type, width, height, inputCount } = node;
+
   if (type === 'NOT') {
     return (
       <path
@@ -412,13 +558,16 @@ function renderGateInputs(type: CircuitGate['type'], width: number, height: numb
   }
 
   if (type === 'AND' || type === 'OR') {
-    const topInputs = [18, height / 2, height - 18];
+    const count = Math.max(inputCount, 2);
+    const step = height / (count + 1);
+    const inputYs = Array.from({ length: count }, (_, index) => step * (index + 1));
+
     return (
       <>
-        {topInputs.map((inputY, index) => (
+        {inputYs.map((inputY, index) => (
           <path
             key={`${type}-input-${index}`}
-            d={`M 0 ${inputY} H 12`}
+            d={`M 0 ${inputY} H 14`}
             className={strokeClass}
             stroke="currentColor"
             strokeWidth="2.4"
@@ -433,11 +582,13 @@ function renderGateInputs(type: CircuitGate['type'], width: number, height: numb
   return null;
 }
 
-function renderGateOutput(type: CircuitGate['type'], width: number, height: number, strokeClass: string) {
+function renderGateOutput(node: LayoutNode, strokeClass: string) {
+  const { type, width, height } = node;
+
   if (type === 'AND' || type === 'OR') {
     return (
       <path
-        d={`M ${width - 2} ${height / 2} H ${width + 18}`}
+        d={`M ${width - 2} ${height / 2} H ${width + 28}`}
         className={strokeClass}
         stroke="currentColor"
         strokeWidth="2.4"
@@ -450,7 +601,7 @@ function renderGateOutput(type: CircuitGate['type'], width: number, height: numb
   if (type === 'NOT') {
     return (
       <path
-        d={`M ${width - 6} ${height / 2} H ${width + 14}`}
+        d={`M ${width - 2} ${height / 2} H ${width + 28}`}
         className={strokeClass}
         stroke="currentColor"
         strokeWidth="2.4"
