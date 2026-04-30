@@ -31,6 +31,15 @@ If you have already pushed your changes to github, it is safer to use git revert
 
 ```sh
 git log --oneline
-git revert --no-commit 7be586a..HEAD 
+git revert --no-commit ccd016a..HEAD 
 git commit -m "..."
 ```
+
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => ({
+  server: {
+    host: "127.0.0.1",
+    port: 5173,
+    strictPort: false,
+  },
+  
