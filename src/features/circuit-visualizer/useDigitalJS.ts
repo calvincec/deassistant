@@ -1,6 +1,43 @@
 import { useEffect, useState, type RefObject } from 'react';
 import type { DigitalJSNetlist } from './types';
-import type { DigitalJSPaper, UseDigitalJSResult } from './types';
+import type { UseDigitalJSResult } from './types';
+
+// Shared loader to avoid importing jQuery / jquery-ui / digitaljs multiple times
+let digitaljsLoader: Promise<any> | null = null;
+async function loadDigitalResources() {
+  if (digitaljsLoader) return digitaljsLoader;
+
+  digitaljsLoader = (async () => {
+    const $module = await import('jquery');
+    const $ = ($module && ($module.default ?? $module));
+
+    try {
+      // expose globals required by DigitalJS
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).$ = $;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).jQuery = $;
+    } catch (e) {
+      // ignore
+    }
+
+    // Ensure jquery-ui/widget is loaded (may be provided by different packages)
+    try {
+      await import('jquery-ui/ui/widget');
+    } catch (e) {
+      try {
+        await import('jquery-ui');
+      } catch (err) {
+        // ignore — widget may already be available
+      }
+    }
+
+    const djModule = await import('digitaljs');
+    return djModule;
+  })();
+
+  return digitaljsLoader;
+}
 
 export function useDigitalJS(
   containerRef: RefObject<HTMLDivElement | null>,
@@ -26,39 +63,11 @@ export function useDigitalJS(
     container.replaceChildren();
 
     let circuit: any | null = null;
-    let paper: DigitalJSPaper | null = null;
+    let paper: any | null = null;
 
     (async () => {
       try {
-        // Load jQuery first and expose globals required by DigitalJS,
-        // then import DigitalJS so it sees the global jQuery during module evaluation.
-        const $module = await import('jquery');
-        const $ = ($module && ($module.default ?? $module));
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (window as any).$ = $;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (window as any).jQuery = $;
-        } catch (e) {
-          // ignore
-        }
-
-        // Load jquery-ui's widget factory so `$.widget` is available.
-        try {
-          // Some packaging setups expose jquery-ui modules under this path
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          await import('jquery-ui/ui/widget');
-        } catch (e) {
-          // If that fails, try the legacy package name
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            await import('jquery-ui');
-          } catch (err) {
-            // ignore — jquery-ui may already be loaded by digitaljs or unavailable
-          }
-        }
-
-        const djModule = await import('digitaljs');
+        const djModule = await loadDigitalResources();
         const Circuit = (djModule as any).Circuit;
 
         circuit = new Circuit(netlist);

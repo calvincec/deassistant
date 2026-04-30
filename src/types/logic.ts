@@ -67,6 +67,8 @@ export interface SolverResult {
   implicants: Implicant[];
   essentialImplicants: Implicant[];
   steps: KMapStep[] | QMCStep[];
+  // Optional canonical (unminimized) expression string, e.g. "F = A'B'C + ..."
+  canonicalExpression?: string;
 }
 
 export interface AppState {

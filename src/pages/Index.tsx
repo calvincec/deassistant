@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { Play, RotateCcw, Cpu, ArrowLeft } from 'lucide-react';
 import { solveKMap } from '@/logic/kmap/kmapSolver';
 import { solveQMC } from '@/logic/qmc/qmcSolver';
+import { buildCanonicalSOP } from '@/features/circuit-visualizer/canonicalExpression';
 import { useToast } from '@/hooks/use-toast';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { generateVariableLabels } from '@/logic/normalize/inputNormalizer';
@@ -79,8 +80,11 @@ const Index = () => {
       const solverResult = solverMethod === 'kmap'
         ? solveKMap(canonicalForm, outputFormat)
         : solveQMC(canonicalForm, outputFormat);
-      
-      setResult(solverResult);
+
+      // Attach canonical (unminimized) SOP expression derived from the canonical form
+      const canonicalExpr = buildCanonicalSOP(canonicalForm);
+      // Avoid mutating solver internals; create a shallow copy with canonicalExpression
+      setResult({ ...solverResult, canonicalExpression: canonicalExpr });
       setIsSolutionViewOpen(true);
       
       toast({

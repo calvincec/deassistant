@@ -9,7 +9,7 @@ import { QMCVisualizer } from '@/components/qmc/QMCVisualizer';
 import { ResultsPanel } from '@/components/results/ResultsPanel';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { KMapStep, QMCStep } from '@/types/logic';
-import { CircuitVisualizer } from '@/features/circuit-visualizer';
+import { CircuitVisualizer, BeforeAfterCircuitVisualizer } from '@/features/circuit-visualizer';
 
 export function StepByStepViewer() {
   const { 
@@ -153,7 +153,14 @@ export function StepByStepViewer() {
             outputFormat={outputFormat}
           />
 
-          <CircuitVisualizer expression={`F = ${result.expression}`} />
+          {result.canonicalExpression ? (
+            <BeforeAfterCircuitVisualizer
+              originalExpression={result.canonicalExpression}
+              minimizedExpression={`F = ${result.expression}`}
+            />
+          ) : (
+            <CircuitVisualizer expression={`F = ${result.expression}`} />
+          )}
         </>
       )}
     </div>
