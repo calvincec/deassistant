@@ -3,10 +3,6 @@ import { mintermToBinary, countOnes } from '../normalize/inputNormalizer';
 import { findAllGroups, mergeOverlappingGroups } from './kmapGrouping';
 import { generateKMapSteps } from './kmapVisualizer';
 
-/**
- * K-Map Solver
- * Implements visual K-map simplification with step-by-step explanation
- */
 
 export function solveKMap(
   canonical: CanonicalForm,

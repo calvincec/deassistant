@@ -1,15 +1,10 @@
 import { CanonicalForm, CellValue, TruthTableRow } from '@/types/logic';
 
-/**
- * Normalizes all input formats into a canonical form
- * The canonical form contains minterms, maxterms, and don't cares
- */
 
 export function normalizeFromKMap(
-  grid: CellValue[][],
-  variableCount: number,
-  variableLabels: string[]
-): CanonicalForm {
+  grid: CellValue[][], variableCount: number, variableLabels: string[]
+): CanonicalForm 
+{
   const minterms: number[] = [];
   const maxterms: number[] = [];
   const dontCares: number[] = [];
