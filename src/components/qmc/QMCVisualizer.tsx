@@ -158,7 +158,10 @@ function ImplicantChart({ chart, minterms, implicants, labels }: {
               {chart[impIdx]?.map((covers, termIdx) => (
                 <td key={termIdx}>
                   {covers && (
-                    <Check className="w-4 h-4 text-accent mx-auto" />
+                    <Check
+                      className="mx-auto h-5 w-5 rounded-full bg-accent/15 p-0.5 text-accent"
+                      strokeWidth={3}
+                    />
                   )}
                 </td>
               ))}
