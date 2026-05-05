@@ -155,7 +155,7 @@ export function StepByStepViewer() {
 
           {result.canonicalExpression ? (
             <BeforeAfterCircuitVisualizer
-              originalExpression={result.canonicalExpression}
+              canonicalForm={canonicalForm}
               minimizedExpression={`F = ${result.expression}`}
             />
           ) : (
